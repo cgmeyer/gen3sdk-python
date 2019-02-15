@@ -50,3 +50,18 @@ class Gen3File:
         output = requests.get(api_url, auth=self._auth_provider).text
         data = json.loads(output)
         return data
+    
+    def download_file(self, guid, filename=None):
+        """Download a file by using a guid.
+
+        Args:
+            guid (str): The GUID for the object to retrieve.
+            filename (str, optional): The custom filename the user wishes to use, default is the original filename from metadata.
+
+        Examples:
+
+            >>> Gen3File.download_file(guid)
+
+        """
+         # TODO: Implementation for download_file
+        raise NotImplementedError

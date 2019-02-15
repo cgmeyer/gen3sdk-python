@@ -39,7 +39,7 @@ class Gen3Submission:
         outfile.close
         print("\nOutput written to file: "+filename)
 
-    def query(self, query_txt, variables=None, max_tries=1):
+    def query(self, query_txt, variables=None, first=None, last=None, offset=None, sort_field=None, sort_order=None, max_tries=11):
         """Execute a GraphQL query against a data commons.
 
         Args:
@@ -55,6 +55,7 @@ class Gen3Submission:
             ... Gen3Submission.query(query)
 
         """
+        # TODO add support for additional arguments
         api_url = "{}/api/v0/submission/graphql".format(self._endpoint)
         if variables == None:
             query = {"query": query_txt}
@@ -133,7 +134,7 @@ class Gen3Submission:
             self.__export_file(filename, output)
             return output
 
-    def submit_record(self, program, project, json):
+    def submit_record(self, program, project, data, data_format, chunk_size=0):
         """Submit record(s) to a project as json.
 
         Args:
@@ -147,6 +148,10 @@ class Gen3Submission:
             >>> Gen3Submission.submit_record("DCF", "CCLE", json)
 
         """
+        assert data_format in ["json","tsv", "csv"],"Data format must be either 'json', 'tsv' or 'csv'"
+        
+        # TODO: add support fot TSV and CSV, also chunking feature
+        
         api_url = "{}/api/v0/submission/{}/{}".format(self._endpoint, program, project)
         output = requests.put(api_url, auth=self._auth_provider, json=json).text
         return output
@@ -268,6 +273,42 @@ class Gen3Submission:
 
         """
         return self.get_dictionary_node("_all")
+
+    def get_template_node(self, node_type):
+        """Returns the template for a specific node.
+
+        This gets the current TSV template for a specific node type in a commons.
+
+        Args:
+            node_type (str): The node_type (or name of the node) to retrieve.
+
+        Examples:
+            This returns the TSV template the "subject" node.
+
+            >>> Gen3Submission.get_template_node("subject")
+
+        """
+         # TODO: Implementation for get_template_node
+        raise NotImplementedError
+
+    def get_template_all(self, exclude=None, categories=None, format="tsv"):
+        """Returns the template for all entity types.
+
+        This gets the current TSV template for all entity types type in a commons.
+
+        Args:
+            exclude (str, optional): The list of entities’ categories to exclude from the template, default is none.
+            categories (str, optional): The list of entities’ categories to include from the template, default is none.
+            format (str, optional): The format of output as either 'csv' or 'tsv', default is 'tsv'.
+
+        Examples:
+            This returns the TSV templates for all nodes.
+
+            >>> Gen3Submission.get_template_all()
+
+        """
+         # TODO: Implementation for get_template_all
+        raise NotImplementedError
 
     def get_graphql_schema(self):
         """Returns the GraphQL schema for a commons.
