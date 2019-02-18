@@ -2,7 +2,7 @@ import json
 import requests
 
 
-class Gen3FileError(Exception):
+class Gen3DiscoveryError(Exception):
     pass
 
 
@@ -56,4 +56,3 @@ class Gen3Discovery:
         def query(self, root_node, record_props, first=None, last=None, offset=None, sort_field=None, sort_order=None):
             # TODO: Implementation for query
             raise NotImplementedError
-            
