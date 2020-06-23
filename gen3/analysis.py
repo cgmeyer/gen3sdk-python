@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from pandas_datareader import data #BB need: pip install pandas_datareader
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split, LeaveOneOut, KFold, cross_val_score
 
 #from pandas.tools.plotting import table
 
@@ -76,7 +78,7 @@ class Gen3Analysis(Gen3Submission):
         print("\nOutput written to file: "+filename)
 
 
-    def plot_categorical_property(self, property,df):
+    def plot_categorical_property(self, df, property):
         #plot a bar graph of categorical variable counts in a dataframe
         df = df[df[property].notnull()]
         N = len(df)
@@ -92,7 +94,7 @@ class Gen3Analysis(Gen3Submission):
         plt.show()
 
 
-    def plot_categorical_property_by_order(self, property,df): 
+    def plot_categorical_property_by_order(self, df, property): 
         #plot a bar graph of categorical variable counts in a dataframe
         df = df[df[property].notnull()]
         N = len(df)
@@ -107,19 +109,25 @@ class Gen3Analysis(Gen3Submission):
         #add N for each bar
         plt.show()
 
+    def pie_categorical_property_count(self, df, property): 
+        #plot a bar graph of categorical variable counts in a dataframe
+        df = df[df[property].notnull()]
+        N = len(df)
+        categories, counts = zip(*df[property].value_counts().items())  #valuecounts orders it from largest to smallest 
+        labels = []
+        for i in range(len(categories)):
+            name = categories[i] + ' (' + str(counts[i]) + ')'
+            labels.append(name)
+        fig, ax = plt.subplots()
+        ax.pie(counts, labels=labels, autopct='%1.1f%%')
+        # Equal aspect ratio ensures that pie is drawn as a circle
+        ax.axis('equal')  
+        plt.title(str('Counts by '+property+' (N = '+str(N)+')'), fontsize=15)
+        plt.tight_layout()
+        plt.show()
 
-    def pie_categorical_property_count(self, property,df): 
-            #plot a bar graph of categorical variable counts in a dataframe
-            df = df[df[property].notnull()]
-            N = len(df)
-            categories, counts = zip(*df[property].value_counts().items())  #valuecounts orders it from largest to smallest 
-            y_pos = np.arange(len(categories))
-            plt.pie(y_pos, labels = categories)
-            #plt.figtext(.8, .8, 'N = '+str(N))
-            plt.title(str('Counts by '+property+' (N = '+str(N)+')'))
-            plt.show()
 
-    def plot_numeric_property(self, property,df,by_project=False):
+    def plot_numeric_property(self, df, property, by_project=False):
         #plot a histogram of numeric variable in a dataframe       #BB: columns with numeric and strings show up as object instead of float
         df[property] = pd.to_numeric(df[property],errors='coerce') #BB: this line changes object into float 
         df = df[df[property].notnull()]
@@ -164,7 +172,36 @@ class Gen3Analysis(Gen3Submission):
         for name, group in groups: 
              plt.plot(group[numeric_property], marker="o", linestyle="", label=name) 
         sns.violinplot(x = categorical_property, y = numeric_property, data = df)
-        plt.title("PDF for "+numeric_property+' by ' + categorical_property+' (N = '+str(N)+')') 
+        plt.title("PDF for "+numeric_property+' by ' + categorical_property+' (N = '+str(N)+')', fontsize=15) 
+        plt.show()
+
+
+    def boxplot_numeric_property_by_categorical_property(self, df, numeric_property, categorical_property):
+        #plot a histogram of numeric variable in a dataframe       #BB: columns with numeric and strings show up as object instead of float
+        df[numeric_property] = pd.to_numeric(df[numeric_property],errors='coerce') #BB: this line changes object into float 
+        df = df[df[numeric_property].notnull()]
+        data = list(df[numeric_property])
+        N = len(data)
+
+        df[categorical_property].apply(str)
+        df = df[df[categorical_property].notnull()]
+        groups = df.groupby(categorical_property) 
+
+        for name, group in groups: 
+             plt.plot(group[numeric_property], marker="o", linestyle="", label=name) 
+        sns.boxplot(x = categorical_property, y = numeric_property, data = df)
+        plt.title("PDF for "+numeric_property+' by ' + categorical_property+' (N = '+str(N)+')', fontsize=15) 
+        plt.show()
+
+
+    def boxplot_numeric_property(self, df, numeric_property):
+        #plot a histogram of numeric variable in a dataframe       #BB: columns with numeric and strings show up as object instead of float
+        df[numeric_property] = pd.to_numeric(df[numeric_property],errors='coerce') #BB: this line changes object into float 
+        df = df[df[numeric_property].notnull()]
+        data = list(df[numeric_property])
+        N = len(data)
+        sns.boxplot(y = numeric_property, data = df, orient="h")
+        plt.title("PDF for "+numeric_property+' (N = '+str(N)+')', fontsize=15) 
         plt.show()
 
 
@@ -175,42 +212,33 @@ class Gen3Analysis(Gen3Submission):
 
         df[numeric_property_b] = pd.to_numeric(df[numeric_property_b],errors='coerce') #BB: this line changes object into float 
         df = df[df[numeric_property_b].notnull()]
-        
-        data = list(df[numeric_property_a])
-        N = len(data)
+        N = len(df)
 
         plt.scatter(df[numeric_property_a], df[numeric_property_b])
-        plt.title(numeric_property_a + " vs " + numeric_property_b)
+        plt.title('Scatter Plot Comparing ' + numeric_property_a + " vs " + numeric_property_b + ' (N = '+str(N)+')', fontsize=15)
         plt.xlabel(numeric_property_a)
         plt.ylabel(numeric_property_b)
         plt.show()
 
-    def scatter_lognumeric_by_lognumeric(self, df, numeric_property_a, numeric_property_b):
-        #plot a histogram of numeric variable in a dataframe       #BB: columns with numeric and strings show up as object instead of float
+
+    def scatter_numeric_by_numeric_by_category(self, df, numeric_property_a, numeric_property_b, categorical_property):
         df[numeric_property_a] = pd.to_numeric(df[numeric_property_a],errors='coerce') #BB: this line changes object into float 
         df = df[df[numeric_property_a].notnull()]
 
         df[numeric_property_b] = pd.to_numeric(df[numeric_property_b],errors='coerce') #BB: this line changes object into float 
         df = df[df[numeric_property_b].notnull()]
-        
-        data = list(df[numeric_property_a])
-        N = len(data)
+        N = len(df)
 
-        plt.scatter(np.math.log(df[numeric_property_a], df[numeric_property_b])) #this needs work
-        plt.title(numeric_property_a + " vs " + numeric_property_b)
+        groups = df.groupby(categorical_property)
+
+        for name, group in groups:
+            plt.plot(group[numeric_property_a], group[numeric_property_b], marker="o", linestyle="", label=name, alpha=0.5)
+        plt.legend(bbox_to_anchor=(1.1, 1.05))
+        plt.title('Scatter Plot Comparing ' + numeric_property_a + " vs " + numeric_property_b + ' segmented by ' + categorical_property + ' (N = '+str(N)+')', fontsize=15)
         plt.xlabel(numeric_property_a)
         plt.ylabel(numeric_property_b)
         plt.show()
 
-#needs work 
-    def node_record_counts(self, project_id):
-        query_txt = """{node (first:-1, project_id:"%s"){type}}""" % (project_id)
-        res = Gen3Submission.query(query_txt)
-        df = json_normalize(res['data']['node'])
-        counts = Counter(df['type'])
-        df = pd.DataFrame.from_dict(counts, orient='index').reset_index()
-        df = df.rename(columns={'index':'node', 0:'count'})
-        return df
 
     def property_counts_table(self, prop, df):
         df = df[df[prop].notnull()]
@@ -219,6 +247,7 @@ class Gen3Analysis(Gen3Submission):
         df1 = df1.rename(columns={'index':prop, 0:'count'}).sort_values(by='count', ascending=False)
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):
             display(df1)
+
 
     def property_counts_by_project(self, prop, df):
         df = df[df[prop].notnull()]
@@ -246,8 +275,19 @@ class Gen3Analysis(Gen3Submission):
 
             project_table = project_table.sort_values(by='Total', ascending=False, na_position='first')
 
-        display(project_table)
+        #display(project_table) #Displays two tables if uncommented out (this line and the return line)
         return project_table
+
+#issue with query_txt
+    def node_record_counts(self, project_id):
+        query_txt = """{node (first:-1, project_id:"%s"){type}}""" % (project_id)
+        res = Gen3Submission.query(query_txt)
+        df = json_normalize(res['data']['node'])
+        counts = Counter(df['type'])
+        df = pd.DataFrame.from_dict(counts, orient='index').reset_index()
+        df = df.rename(columns={'index':'node', 0:'count'})
+        return df
+
 
 #had issue with table 
     def save_table_image(self, df,filename='mytable.png'):
@@ -258,3 +298,5 @@ class Gen3Analysis(Gen3Submission):
         ax.yaxis.set_visible(False)  # hide the y axis
         table(ax, df)  # where df is your data frame
         plt.savefig(filename)
+
+
