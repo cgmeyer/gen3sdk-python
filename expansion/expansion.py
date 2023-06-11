@@ -4477,6 +4477,19 @@ class Gen3Expansion:
                             error = "'{}' prop should be integer, but has non-integer values: {}".format(prop,e)
                             print(error)
                             errors.append(error)
+                            continue  # Skip to the next property if conversion fails
+                    if 'minimum' in dd[node]["properties"][prop]:
+                        minimum = dd[node]["properties"][prop]['minimum']
+                        if (d < minimum).any():
+                            error = "'{}' property has values below the minimum: {}".format(prop, d[d < minimum])
+                            print(error)
+                            errors.append(error)
+                    if 'maximum' in dd[node]["properties"][prop]:
+                        maximum = dd[node]["properties"][prop]['maximum']
+                        if (d > maximum).any():
+                            error = "'{}' property has values above the maximum: {}".format(prop, d[d > maximum])
+                            print(error)
+                            errors.append(error)
                     elif etype == 'boolean':
                         vals = list(set(d))
                         wrong_vals = list(set(vals).difference(['True','False','true','false','TRUE','FALSE']))
