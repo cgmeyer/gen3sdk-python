@@ -2893,11 +2893,16 @@ class Gen3Expansion:
                 "Please provide one or a list of data file file_names: get_guid_for_filename\(file_names=file_name_list\)"
             )
         all_records = []
+        count,total=0,len(file_names)
         for file_name in file_names:
-            print("\tGetting indexd record for {}".format(file_name))
+            count+=1
+            print("\t({}/{})Getting indexd record for {}".format(count,total,file_name))
             index_url = "{}/index/index/?file_name={}".format(self._endpoint, file_name)
             response = requests.get(index_url, auth=self._auth_provider).text
-            response = json.loads(response)
+            try:
+                response = json.loads(response)
+            except Exception as e:
+                print("Error: {}: {}".format(response,e))
             if 'records' in response:
                 records = response['records']
                 if len(records) == 1:
@@ -3129,7 +3134,7 @@ class Gen3Expansion:
         deleted,failed = [],[]
         for guid in guids:
             count+=1
-            fence_url = "{}user/data/".format(self._endpoint)
+            fence_url = "{}/user/data/".format(self._endpoint)
 
             try:
                 response = requests.delete(fence_url + guid, auth=self._auth_provider)
