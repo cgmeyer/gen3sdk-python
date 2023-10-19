@@ -5394,8 +5394,8 @@ class Gen3Expansion:
                 auth=self._auth_provider,
                 data=json.dumps(payload),
             )
-        except:
-            print("\n\tError creating indexd record:\n{}\n{}\n".format(res,res.text))
+        except Exception as e:
+            print("\n\tError creating indexd record:\n{}\n{}\n{}\n".format(res,res.text,e))
         data = res.json()
         return data
 
@@ -5414,8 +5414,8 @@ class Gen3Expansion:
         try:
             data = res.json()
             return data
-        except:
-            print("\n\tNo json in indexd response:\n{}\n{}\n".format(res,res.text))
+        except Exception as e:
+            print("\n\tNo json in indexd response:\n{}\n{}\n{}\n".format(res,res.text,e))
             return res.text
 
 
