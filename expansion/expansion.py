@@ -5377,7 +5377,7 @@ class Gen3Expansion:
         Create a blank indexd record}
         """
         prog,proj = project_id.split("-",1)
-        iurl = "{}index/index".format(self._endpoint)
+        iurl = "{}/index/index".format(self._endpoint)
         payload = {'form': 'object',
             'file_name':file_name,
             'hashes':{'md5':md5},
