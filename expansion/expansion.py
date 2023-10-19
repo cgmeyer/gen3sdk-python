@@ -5403,7 +5403,7 @@ class Gen3Expansion:
         """
         Create a blank indexd record}
         """
-        iurl = "{}index/index/blank".format(self._endpoint)
+        iurl = "{}/index/index/blank".format(self._endpoint)
         payload = {"uploader": uploader, "file_name": file_name}
         res = requests.post(
             iurl,
