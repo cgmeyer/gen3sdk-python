@@ -5359,8 +5359,8 @@ class Gen3Expansion:
                                 md5=md5,
                                 size=size,
                                 project_id=project_id)
-                        except:
-                            print("Couldn't create the indexd record for file {}:\n\t{}".format(file_name,irec))
+                        except Exception as e:
+                            print("Couldn't create the indexd record for file {}:\n\t{}".format(file_name,e))
                         object_id = irec['did']
                         object_ids.append(object_id)
                     df['object_id'] = object_ids
