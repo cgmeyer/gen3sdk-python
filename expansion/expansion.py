@@ -2743,6 +2743,7 @@ class Gen3Expansion:
         print(
             "\t\tScript finished. Total records retrieved: {}".format(len(all_records))
         )
+
         now = datetime.datetime.now()
         date = "{}-{}-{}_{}.{}".format(now.year, now.month, now.day, now.minute, now.second)
 
@@ -2845,15 +2846,21 @@ class Gen3Expansion:
             )
         guids = {}
         if method == "indexd":
+            count,total = 0,len(file_names)
             for file_name in file_names:
+                count+=1
+                print("({}/{}) Retrieving GUID for '{}'.".format(count,total,file_name))
                 index_url = "{}/index/index/?file_name={}".format(
                     self._endpoint, file_name
                 )
                 response = requests.get(index_url, auth=self._auth_provider).text
                 index_record = json.loads(response)
                 if len(index_record["records"]) > 0:
-                    guid = index_record["records"][0]["did"]
-                    guids[file_name] = guid
+                    #did = index_record["records"][0]["did"]
+                    dids = [i['did'] for i in index_record["records"]]
+                    guids[file_name] = dids
+                else:
+                    guids[file_name] = np.nan
         elif method == "sheepdog":
             for file_name in file_names:
                 if match == "file_name":
@@ -2882,6 +2889,10 @@ class Gen3Expansion:
                     )
         else:
             print("Enter a valid method.\n\tValid methods: 'sheepdog','indexd'")
+
+        with open('guids_filenames_map.txt', 'w') as guids_map: 
+            guids_map.write(json.dumps(guids))
+
         return guids
 
     def get_index_for_file_names(self, file_names, format='tsv'):
@@ -3074,19 +3085,34 @@ class Gen3Expansion:
         if isinstance(guids, str):
             guids = [guids]
 
-        index_records = []
+        all_records = []
         for guid in guids:
             print(
                 "\tGetting index for GUID ({}/{}): {}".format(
-                    len(index_records), len(guids), guid
+                    len(all_records), len(guids), guid
                 )
             )
             indexd_endpoint = "{}/index/index/".format(self._endpoint)
             indexd_query = "{}{}".format(indexd_endpoint, guid)
             response = requests.get(indexd_query, auth=self._auth_provider).text
             records = json.loads(response)
-            index_records.append(records)
-        return index_records
+            all_records.append(records)
+
+        now = datetime.datetime.now()
+        date = "{}-{}-{}_{}.{}".format(now.year, now.month, now.day, now.minute, now.second)
+
+        if format == "JSON":
+            outname = "indexd_records_{}.json".format(date)
+            with open(outname, "w") as output:
+                output.write(json.dumps(all_records))
+
+        if format == "TSV":
+            outname = "indexd_records_{}.tsv".format(date)
+            all_records = pd.DataFrame(all_records)
+            all_records['md5sum'] = [hashes.get('md5') for hashes in all_records.hashes]
+            all_records.to_csv(outname,sep='\t',index=False)
+
+        return all_records
 
     # failed = [irec for irec in irecs if irec['size'] == None]
     # failed_guids = [irec['did'] for irec in failed]
