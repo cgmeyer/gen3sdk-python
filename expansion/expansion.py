@@ -2049,7 +2049,7 @@ class Gen3Expansion:
             else:
                 try:
                     json_res = json.loads(response)
-                except JSONDecodeError as e:
+                except Exception as e:
                     print(response)
                     print(str(e))
                     raise Gen3Error("Unable to parse API response as JSON!")
@@ -2284,7 +2284,7 @@ class Gen3Expansion:
             else:
                 try:
                     json_res = json.loads(response)
-                except JSONDecodeError as e:
+                except Exception as e:
                     print(response)
                     print(str(e))
                     raise Gen3Error("Unable to parse API response as JSON!")
@@ -2524,7 +2524,7 @@ class Gen3Expansion:
             else:
                 try:
                     json_res = json.loads(response)
-                except JSONDecodeError as e:
+                except Exception as e:
                     print(response)
                     print(str(e))
                     raise Gen3Error("Unable to parse API response as JSON!")
@@ -2860,6 +2860,7 @@ class Gen3Expansion:
                     dids = [i['did'] for i in index_record["records"]]
                     guids[file_name] = dids
                 else:
+                    print("No records found in indexd with file_name: '{}'!".format(file_name))
                     guids[file_name] = np.nan
         elif method == "sheepdog":
             for file_name in file_names:
