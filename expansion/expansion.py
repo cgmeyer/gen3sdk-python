@@ -590,6 +590,29 @@ class Gen3Expansion:
         else:
             return total
 
+    def paginate_query_simple(
+        self, query_txt, props, chunk_size=1000, offset=0
+    ):
+        """
+            props (str; space-separated): list properties you want returned
+        """
+        results = []
+        data = range(0,1000)
+        while len(data) > 0:
+            print("Total: {}".format(len(results)))
+            query_txt="""
+            {
+             %s (first:%s, offset:%s) {
+                %s
+            }
+            }""" % (node, chunk_size, offset, props)
+
+            res = self.sub.query(query_txt)
+            data = res['data'][node]
+            results = results + data
+            offset += chunk_size
+        return results
+
     def paginate_query_new(
         self,
         node,
