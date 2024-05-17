@@ -4175,6 +4175,36 @@ class Gen3Expansion:
             print("Finished. {} MDS records written to file:\n\t{}".format(len(m),filename))
         return m
 
+    def get_mds_all_args(self, args=None, limit=1000, offset=0, save=True):
+        """
+            Gets all the data in the metadata service for a data commons environment.
+        """    
+        m,done = {},False
+        while done is False:
+            murl = "{}/mds/metadata?data=True&limit={}&offset={}&{}".format(self._endpoint, limit, offset, args)
+            print("Fetching records for: {}".format(murl))
+            try:
+                response = requests.get(murl)
+                mds = json.loads(response.text)
+                if len(mds) == 0:
+                    done = True
+                else:
+                    m.update(mds)
+
+            except Exception as e:
+                print("\tUnable to parse MDS response as JSON!\n\t\t{} {}".format(type(e), e))
+                md = response.text
+            offset += limit
+
+        if save == True:
+            now = datetime.datetime.now()
+            date = "{}-{}-{}-{}.{}.{}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+            filename = "MDS_{}_{}.json".format(len(m),date)
+
+            with open(filename, 'w') as json_file:
+                json.dump(m, json_file)
+            print("Finished. {} MDS records written to file:\n\t{}".format(len(m),filename))
+        return m
 
 
     def delete_mds(self,guids):
