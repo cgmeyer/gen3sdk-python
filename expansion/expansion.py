@@ -4226,7 +4226,7 @@ class Gen3Expansion:
 
             if res.status_code == 200:
                 deleted.append(guid)
-                print("({}/{}) Deleteted '{}' from MDS.".format(count, total, guid))
+                print("({}/{}) Deleted '{}' from MDS.".format(count, total, guid))
             else:
                 failed.append(guid)
                 print("({}/{}) FAILED to delete '{}' from MDS.".format(count, total, guid))
