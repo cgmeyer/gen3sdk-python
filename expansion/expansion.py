@@ -608,9 +608,12 @@ class Gen3Expansion:
             }""" % (node, chunk_size, offset, props)
 
             res = self.sub.query(query_txt)
+            if 'data' not in res or len(res['data'][node]) < 1:
+                print(res)
             data = res['data'][node]
             results = results + data
             offset += chunk_size
+
         return results
 
     def paginate_query_new(
