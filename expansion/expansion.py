@@ -591,7 +591,7 @@ class Gen3Expansion:
             return total
 
     def paginate_query_simple(
-        self, props, chunk_size=1000, offset=0
+        self, node, props, chunk_size=1000, offset=0
     ):
         """
             props (str; space-separated): list properties you want returned
