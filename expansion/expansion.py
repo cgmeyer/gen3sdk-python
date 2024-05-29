@@ -3107,8 +3107,46 @@ class Gen3Expansion:
         index_records = response["records"]
         return index_records
 
-    def get_index_for_guids(self, guids):
-        """Returns the indexd record for a GUID ('urls' in indexd)"""
+    def get_index_for_guids(self, guids, chunk_size=2000):
+        """ Uses the index/bulk/documents endpoint to fetch all the indexd records for a list of GUIDs """
+        if isinstance(guids, str):
+            guids = [guids]
+
+        chunk_size=2000
+        lower,upper = 0,chunk_size
+        all_records = []
+        while lower < len(guids):
+            print("(Fetching {}/{} GUIDs): fetching {} through {}.".format(len(all_records),len(guids),lower,upper))
+            bulk_guids = guids[lower:upper]
+            bulk_endpoint = "{}/index/bulk/documents".format(self._endpoint)
+            response = requests.post(bulk_endpoint, json=bulk_guids, auth=self._auth_provider)
+            print(response)
+            irecs = json.loads(response.text)
+            len(irecs)
+            all_records = all_records + irecs
+            lower += chunk_size
+            upper += chunk_size
+            if lower > len(guids):
+                print("Finished. {} total indexd records fetched for {} provided GUIDs.".format(len(all_records),len(guids)))
+
+        now = datetime.datetime.now()
+        date = "{}-{}-{}_{}.{}".format(now.year, now.month, now.day, now.minute, now.second)
+
+        if format == "JSON":
+            outname = "indexd_records_{}.json".format(date)
+            with open(outname, "w") as output:
+                output.write(json.dumps(all_records))
+
+        if format == "TSV":
+            outname = "indexd_records_{}.tsv".format(date)
+            all_records = pd.DataFrame(all_records)
+            all_records['md5sum'] = [hashes.get('md5') for hashes in all_records.hashes]
+            all_records.to_csv(outname,sep='\t',index=False)
+
+        return all_records
+
+    def get_index_for_guids_old(self, guids):
+        """Returns the indexd record for a list of GUIDs ('urls' in indexd)"""
         if isinstance(guids, str):
             guids = [guids]
 
