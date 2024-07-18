@@ -2713,6 +2713,8 @@ class Gen3Expansion:
 
         return records
 
+
+
     def get_indexd(self, limit=1000, page=0, format="JSON", uploader=None, args=None):
         """get all the records in indexd
             api = "https://icgc.bionimbus.org/"
@@ -4183,7 +4185,36 @@ class Gen3Expansion:
 
         return md
 
+    def get_aggmds_all(self, limit=1000, offset=0, save=True):
+        """
+            Gets all the data in the metadata service for a data commons environment.
+        """    
+        m,done = {},False
+        while done is False:
+            murl = "{}/mds/aggregate/metadata?data=True&limit={}&offset={}".format(self._endpoint, limit, offset)
+            print("Fetching AggMDS records for: {}".format(murl))
+            try:
+                response = requests.get(murl)
+                mds = json.loads(response.text)
+                if len(mds) == 0:
+                    done = True
+                else:
+                    m.update(mds)
 
+            except Exception as e:
+                print("\tUnable to parse AggMDS response as JSON!\n\t\t{} {}".format(type(e), e))
+                md = response.text
+            offset += limit
+
+        if save == True:
+            now = datetime.datetime.now()
+            date = "{}-{}-{}-{}.{}.{}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+            filename = "AggMDS_{}_{}.json".format(len(m),date)
+
+            with open(filename, 'w') as json_file:
+                json.dump(m, json_file)
+            print("Finished. {} MDS records written to file:\n\t{}".format(len(m),filename))
+        return m
 
     def get_mds_all(self, limit=1000, offset=0, save=True):
         """
