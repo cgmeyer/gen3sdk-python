@@ -168,7 +168,7 @@ class Gen3Expansion:
         queries = []
         # Return all project_ids in the data commons if no node is provided or if node is program but no name provided
         if name == None and ((node == None) or (node == "program")):
-            print("Getting all project_ids you have access to in the data commons.")
+            print("Getting all project_ids you have access to in {}".format(self._endpoint))
             if node == "program":
                 print(
                     "Specify a list of program names (name = ['myprogram1','myprogram2']) to get only project_ids in particular programs."
@@ -4171,6 +4171,57 @@ class Gen3Expansion:
                 md = []
                 for guid in guids:
                     murl = "{}/mds/metadata/{}".format(self._endpoint, guid)
+                    print("Fetching metadata from URL: \n\t{}".format(murl))
+                    response = requests.get(murl)
+                    md.append(json.loads(response.text))
+
+        if save == True:
+            now = datetime.datetime.now()
+            date = "{}-{}-{}-{}.{}.{}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+            filename = "MDS_{}.json".format(date)
+
+            with open(filename, 'w') as fp:
+                json.dump(md, fp)
+
+        return md
+
+    def get_aggmds(self, data=True, limit=1000, args=None, guids=None, save=False):
+        """
+            Gets all the AggMDS data in the metadata service for a data commons environment.
+            Set data=False to get only the "guids" of the metadata entries.
+        """
+
+        if guids is None:
+            if args is None:
+                murl = "{}/mds/aggregate/metadata?limit={}".format(self._endpoint, limit)
+            else:
+                murl = "{}/mds/aggregate/metadata?limit={}&{}".format(self._endpoint, limit, args)
+
+            if data is True:
+                murl += "&data=True"
+
+            print("Fetching metadata from URL: \n\t{}".format(murl))
+            try:
+                response = requests.get(murl)
+                md = json.loads(response.text)
+
+            except Exception as e:
+                print("\tUnable to parse MDS response as JSON!\n\t\t{} {}".format(type(e), e))
+                md = response.text
+
+        else:
+            if isinstance(guids,str):
+                murl = "{}/mds/aggregate/metadata/{}".format(self._endpoint, guids)
+                print("Fetching metadata from URL: \n\t{}".format(murl))
+
+                response = requests.get(murl)
+                d = json.loads(response.text)
+                md = {guids: d}
+
+            elif isinstance(guids,list):
+                md = []
+                for guid in guids:
+                    murl = "{}/mds/aggregate/metadata/{}".format(self._endpoint, guid)
                     print("Fetching metadata from URL: \n\t{}".format(murl))
                     response = requests.get(murl)
                     md.append(json.loads(response.text))
