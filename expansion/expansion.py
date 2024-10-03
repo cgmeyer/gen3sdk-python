@@ -1043,6 +1043,7 @@ class Gen3Expansion:
                         submission_order.append(
                             (node, max([item[1] for item in parents_order]) + 1)
                         )
+        submission_order = sorted(submission_order, key=lambda x: x[1])
         return submission_order
 
     def delete_project(self, project_id, root_node="project", chunk_size=200, nuke_project=False):
@@ -4132,8 +4133,6 @@ class Gen3Expansion:
 
         return df
 
-
-
     def get_mds(self, data=True, limit=1000, args=None, guids=None, save=True):
         """
             Gets all the data in the metadata service for a data commons environment.
@@ -5678,3 +5677,4 @@ class Gen3Expansion:
         print(mushroom_cloud1)
         print("\t\t{}".format(message))
         print(mushroom_cloud2)
+
