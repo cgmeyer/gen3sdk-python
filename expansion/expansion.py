@@ -2789,6 +2789,7 @@ class Gen3Expansion:
 
         return all_records
 
+
     def delete_indexd_records(self,irecs):
         """
         Arguments:
@@ -5677,4 +5678,5 @@ class Gen3Expansion:
         print(mushroom_cloud1)
         print("\t\t{}".format(message))
         print(mushroom_cloud2)
+
 
