@@ -11,6 +11,7 @@ import random
 from random import randrange
 from pathlib import Path
 
+import time 
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
@@ -2308,6 +2309,7 @@ class Gen3Expansion:
                 results["responses"].append("Reducing Chunk Size: {}".format(response))
                 timeout = True
 
+
             else:
                 try:
                     json_res = json.loads(response)
@@ -2547,6 +2549,7 @@ class Gen3Expansion:
                 print("\t Reducing Chunk Size: {}".format(response))
                 results["responses"].append("Reducing Chunk Size: {}".format(response))
                 timeout = True
+                time.sleep(10)
 
             else:
                 try:
