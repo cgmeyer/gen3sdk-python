@@ -2073,6 +2073,7 @@ class Gen3Expansion:
                 print("\t Reducing Chunk Size: {}".format(response))
                 results["responses"].append("Reducing Chunk Size: {}".format(response))
                 timeout = True
+                time.sleep(20)
 
             else:
                 try:
@@ -2308,7 +2309,7 @@ class Gen3Expansion:
                 print("\t Reducing Chunk Size: {}".format(response))
                 results["responses"].append("Reducing Chunk Size: {}".format(response))
                 timeout = True
-
+                time.sleep(20)
 
             else:
                 try:
