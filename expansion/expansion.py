@@ -216,7 +216,7 @@ class Gen3Expansion:
             for query in queries:
                 res = self.sub.query(query)
                 df = pd.json_normalize(res["data"]["project"])
-                project_ids = project_ids + list(set(df["project_id"]))
+                project_ids = project_ids + list(set(df.get("project_id",[])))
         my_ids = sorted(project_ids, key=str.lower)
         print(my_ids)
         return my_ids
