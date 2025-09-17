@@ -406,14 +406,14 @@ class Gen3Expansion:
             for node in counts:
                 filename = str(mydir + "/" + project_id + "_" + node + ".tsv")
                 if (os.path.isfile(filename)) and (overwrite == False):
-                    print("\n\tPreviously downloaded: '{}'".format(filename))
+                    print(f"\t'{node}': Previously downloaded: '{filename}'")
                 else:
                     count = counts[node]
                     if count > 0 or save_empty == True:
-                        print(f"\n\t'{node}': {count} records. Downloading...")
+                        print(f"\t'{node}': {count} records. Downloading...")
                         self.sub.export_node(prog, proj, node, "tsv", filename)
                     else:
-                        print(f"\n\t'{node}': {count} records. Skipping.")
+                        print(f"\t'{node}': {count} records. Skipping.")
 
         cmd = ["ls", mydir]  # look in the download directory
         try:
