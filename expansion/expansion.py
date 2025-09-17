@@ -354,7 +354,7 @@ class Gen3Expansion:
 
     def get_project_tsvs(
         self,
-        projects=None,
+        project_ids=None,
         nodes=None,
         outdir="project_tsvs",
         overwrite=False,
@@ -382,51 +382,38 @@ class Gen3Expansion:
         elif not isinstance(nodes, list):
             raise Gen3Error("nodes must be a list of node names or a single node name")
 
-        if projects == None:  # if no projects specified, get node for all projects
-            projects = sorted(list(
+        if project_ids == None:  # if no projects specified, get node for all projects
+            project_ids = sorted(list(
                 pd.json_normalize(
                     self.sub.query("""{project (first:0){project_id}}""")["data"][
                         "project"
                     ]
                 )["project_id"]
             ))
-        elif isinstance(projects, str):
-            projects = [projects]
+        elif isinstance(project_ids, str):
+            project_ids = [project_ids]
 
-        # now = datetime.datetime.now()
-        # date = "{}-{}-{}-{}.{}.{}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
-
-        for project_id in projects:
-            #mydir = "{}_{}/{}_tsvs".format(outdir, date, project_id)  # create the directory to store TSVs
+        for i in range(0,len(project_ids)):
+            project_id = project_ids[i]
+            prog, proj = project_id.split("-", 1)
+            print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading TSVs for project...")
             mydir = "{}/{}_tsvs".format(outdir, project_id)  # create the directory to store TSVs
-
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
-
             # get node counts for the project and subset to nodes with >0 records
             node_counts = {}
             counts = self.get_node_counts(nodes, project_id=project_id)
-
             for node in counts:
                 filename = str(mydir + "/" + project_id + "_" + node + ".tsv")
                 if (os.path.isfile(filename)) and (overwrite == False):
-                    print("\tPreviously downloaded: '{}'".format(filename))
+                    print("\n\tPreviously downloaded: '{}'".format(filename))
                 else:
                     count = counts[node]
                     if count > 0 or save_empty == True:
-                        print(
-                            "\nDownloading {} records in node '{}' of project '{}'.".format(
-                                count, node, project_id
-                            )
-                        )
-                        prog, proj = project_id.split("-", 1)
+                        print(f"\n\t'{node}': {count} records. Downloading...")
                         self.sub.export_node(prog, proj, node, "tsv", filename)
                     else:
-                        print(
-                            "\t{} records in node '{}' of project '{}'.".format(
-                                count, node, project_id
-                            )
-                        )
+                        print(f"\n\t'{node}': {count} records. Skipping.")
 
         cmd = ["ls", mydir]  # look in the download directory
         try:
@@ -435,8 +422,9 @@ class Gen3Expansion:
             )
         except Exception as e:
             output = "ERROR:" + e.output.decode("UTF-8")
-
         return output
+
+
 
     # Query Functions
     def query_counts(
