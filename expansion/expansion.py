@@ -10,6 +10,8 @@ from itertools import cycle
 import random
 from random import randrange
 from pathlib import Path
+from contextlib import redirect_stdout
+
 
 import time 
 import numpy as np
@@ -411,7 +413,9 @@ class Gen3Expansion:
                     count = counts[node]
                     if count > 0 or save_empty == True:
                         print(f"\t'{node}': {count} records. Downloading...")
-                        self.sub.export_node(prog, proj, node, "tsv", filename)
+                        f = StringIO()
+                        with redirect_stdout(f):
+                            self.sub.export_node(prog, proj, node, "tsv", filename)
                     else:
                         print(f"\t'{node}': {count} records. Skipping.")
 
