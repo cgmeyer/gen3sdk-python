@@ -300,6 +300,58 @@ class Gen3Expansion:
         )
         return all_data
 
+
+
+
+
+    # Query Functions
+    def get_node_counts(
+        self,
+        nodes,
+        project_id=None,
+    ):
+        """ Get the counts of all nodes in a project.
+
+        Args:
+            nodes (list): The nodes to get counts for.
+            project_id(str): The project_id to limit the query to.
+        Example:
+            exp.node_counts_by_project(project_id='Exhale-Tempus',nodes=['case','sample','aliquot'])
+        """
+        counts = {}
+        program, project = project_id.split("-", 1)
+        if nodes == None:
+            dd = self.sub.get_dictionary_all()
+            nodes = sorted([n for n in list(set(dd)) if n not in ['program','project','root','data_release','metaschema','_terms','_settings','_definitions']])
+        elif isinstance(nodes, str):
+            nodes = [nodes]
+        elif not isinstance(nodes, list):
+            raise Gen3Error("nodes must be a list of node names or a single node name")
+
+
+        if project_id != None:
+            query_txt = "{"
+            for node in nodes:
+                query_txt += f'\n\t_{node}_count (project_id:"{project_id}")'
+            query_txt += "\n}"
+        else:
+            query_txt = "{"
+            for node in nodes:
+                query_txt += f'\n_{node}_count")'
+            query_txt += "}"
+        try:
+            res = self.sub.query(query_txt)
+            for k in list(res['data'].keys()):
+                node = k.lstrip('_').replace('_count','')
+                counts[node] = res["data"][k]
+            # sort counts by value
+            counts = dict(sorted(counts.items(), key=operator.itemgetter(1), reverse=True))
+        except:
+            print("\n\tQuery to get _{}_count failed! {}".format(node, query_txt))
+        return counts
+
+
+
     def get_project_tsvs(
         self,
         projects=None,
@@ -307,7 +359,7 @@ class Gen3Expansion:
         outdir="project_tsvs",
         overwrite=False,
         save_empty=False,
-        remove_nodes=["program", "project", "root", "data_release"],
+        remove_nodes=['program','project','root','data_release','metaschema','_terms','_settings','_definitions'],
     ):
         """Function gets a TSV for every node in a specified project.
             Exports TSV files into a directory "project_tsvs/".
@@ -323,32 +375,21 @@ class Gen3Expansion:
 
         """
         if nodes == None:
-            nodes = sorted(
-                list(
-                    set(
-                        pd.json_normalize(
-                            self.sub.query("""{_node_type (first:-1) {id}}""")["data"][
-                                "_node_type"
-                            ]
-                        )["id"]
-                    )
-                )
-            )  # get all the 'node_id's in the data model
+            dd = self.sub.get_dictionary_all()
+            nodes = sorted([n for n in list(set(dd)) if n not in remove_nodes])
         elif isinstance(nodes, str):
             nodes = [nodes]
-
-        for node in remove_nodes:
-            if node in nodes:
-                nodes.remove(node)
+        elif not isinstance(nodes, list):
+            raise Gen3Error("nodes must be a list of node names or a single node name")
 
         if projects == None:  # if no projects specified, get node for all projects
-            projects = list(
+            projects = sorted(list(
                 pd.json_normalize(
                     self.sub.query("""{project (first:0){project_id}}""")["data"][
                         "project"
                     ]
                 )["project_id"]
-            )
+            ))
         elif isinstance(projects, str):
             projects = [projects]
 
@@ -362,16 +403,16 @@ class Gen3Expansion:
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
 
-            for node in nodes:
+            # get node counts for the project and subset to nodes with >0 records
+            node_counts = {}
+            counts = self.get_node_counts(nodes, project_id=project_id)
+
+            for node in counts:
                 filename = str(mydir + "/" + project_id + "_" + node + ".tsv")
                 if (os.path.isfile(filename)) and (overwrite == False):
                     print("\tPreviously downloaded: '{}'".format(filename))
                 else:
-                    query_txt = """{_%s_count (project_id:"%s")}""" % (node, project_id)
-                    res = self.sub.query(
-                        query_txt
-                    )  #  {'data': {'_acknowledgement_count': 0}}
-                    count = res["data"][str("_" + node + "_count")]  # count=int(0)
+                    count = counts[node]
                     if count > 0 or save_empty == True:
                         print(
                             "\nDownloading {} records in node '{}' of project '{}'.".format(
@@ -406,8 +447,7 @@ class Gen3Expansion:
         format="json",
         args=None,
     ):
-        """Function to paginate a query to avoid time-outs.
-        Returns a json of all the records in the node.
+        """ Get the counts of all nodes in a project.
 
         Args:
             nodes (list): The nodes to get counts for.
@@ -445,9 +485,8 @@ class Gen3Expansion:
                 counts[node] = qsize
             except:
                 print("\n\tQuery to get _{}_count failed! {}".format(node, query_txt))
-
-
         return counts
+
 
 
     # Query Functions
