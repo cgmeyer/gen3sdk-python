@@ -3480,32 +3480,18 @@ class Gen3Expansion:
                         project_dir
                     )
                 )
-
             fpattern = "{}*{}".format(prefix, ".tsv")
             fnames = glob.glob("{}/{}".format(project_dir, fpattern))
-
             # msg = "\t\tFound the following {} TSVs: {}".format(len(fnames),fnames)
             # sys.stdout.write("\r" + str(msg))
-
             # print(fnames) # trouble-shooting
             if len(fnames) == 0:
                 continue
-
-            for (
-                fname
-            ) in (
-                fnames
-            ):  # Each node with data in the project is in one TSV file so len(fnames) is the number of nodes in the project with data.
-
+            for fname in fnames:  # Each node with data in the project is in one TSV file so len(fnames) is the number of nodes in the project with data.
                 # print("\n\t\t{}".format(fname)) # trouble-shooting
-
-                node_regex = (
-                    re.escape(project_id) + r"_([a-zA-Z0-9_]+)\.tsv$"
-                )  # node = re.search(r'^([a-zA-Z0-9_]+)-([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)\.tsv$',fname).group(3)
-
+                node_regex = (re.escape(project_id) + r"_([a-zA-Z0-9_]+)\.tsv$")  # node = re.search(r'^([a-zA-Z0-9_]+)-([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)\.tsv$',fname).group(3)
                 try:
                     node = re.search(node_regex, fname, re.IGNORECASE).group(1)
-
                 except Exception as e:
                     print(
                         "\n\nCouldn't set node with node_regex on '{}':\n\t{}".format(
@@ -3513,8 +3499,15 @@ class Gen3Expansion:
                         )
                     )
                     node = fname
-
-                df = pd.read_csv(fname, sep="\t", header=0, dtype=str)
+                try:
+                    df = pd.read_csv(fname, sep="\t", header=0, dtype=str)
+                except Exception as e:
+                    print(
+                        "\n\nCouldn't read TSV '{}' as a dataframe:\n\t{}".format(
+                            fname, e
+                        )
+                    )
+                    df = pd.DataFrame()
 
                 if df.empty:
                     print("\t\t'{}' TSV is empty. No data to summarize.\n".format(node))
