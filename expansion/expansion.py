@@ -3331,27 +3331,231 @@ class Gen3Expansion:
         return link_names
 
 
-    def get_prop_type(self, node, prop, dd):
-        prop_def = dd[node]["properties"][prop]
-        if "type" in prop_def:
-            prop_type = prop_def["type"]
-            if "null" in prop_type:
-                prop_type = [prop for prop in prop_type if prop != "null"][0]
-        elif "enum" in prop_def:
-            prop_type = "enum"
-        elif "oneOf" in prop_def:
-            if "type" in prop_def["oneOf"][0]:
-                prop_type = prop_def["oneOf"][0]["type"]
-            elif "enum" in prop_def["oneOf"][0]:
-                prop_type = "enum"
-        elif "anyOf" in prop_def:
-            if isinstance(prop_def["anyOf"], list):
-                prop_type = [x["type"] for x in prop_def["anyOf"] if "items" in x][0]
+
+    def get_prop_type(self, prop, node, dm, include_enums=True):
+        """ Get the type of a property in a node in a Gen3 data model """
+        prop_type = ''
+        prop_def = dm[node]['properties'][prop]
+        if list(prop_def.keys()) == ['$ref']:
+            ref = prop_def['$ref']
+            refs = ref.split('/')
+            if '.yaml#' in refs[0] and 'properties' in refs:
+                ref_node = refs[0].split('.')[0]
+                if prop in dm[ref_node]['properties']:
+                    ref_def = dm[ref_node]['properties'][prop]
+                    if 'type' in ref_def:
+                        prop_type = ref_def['type']
+                    elif 'enum' in ref_def:
+                        if include_enums:
+                            prop_type = {'enum':ref_def['enum']}
+                        else:
+                            prop_type = 'enum'
+                    elif 'term' in ref_def:
+                        if 'type' in ref_def['term']:
+                            prop_type = ref_def['term']['type']
+                    elif '$ref' in ref_def['term']:
+                        ref = ref_def['term']['$ref']
+                        refs = ref.split('/')
+                        if '_terms' in refs[0] and refs[1] in dm['_terms']:
+                            term = dm['_terms'][refs[1]]
+                            if 'type' in term:
+                                prop_type = term['type']
+            elif '_terms' in refs[0] and refs[-1] in dm['_terms']:
+                term = dm['_terms'][ref_prop]
+                if 'type' in term:
+                    prop_type = term['type']
+        if 'type' in prop_def:
+            if isinstance(prop_def['type'],list):
+                types = [t for t in prop_def['type'] if t not in ['null','object']]
+                if len(types) == 1:
+                    prop_type = types[0]
+                else:
+                    prop_type = types
             else:
-                prop_type = prop_def["anyOf"]
-        else:
-            print("Can't get the property type for {}!".format(shared_prop))
+                prop_type = prop_def['type']
+        if 'enum' in prop_def:
+            if include_enums:
+                prop_type = {'enum':prop_def['enum']}
+            else:
+                prop_type = 'enum'
+        if prop_type == '':
+            if 'oneOf' in prop_def:
+                oneof = prop_def['oneOf']
+                oneof = [t for t in oneof if 'type' in t]
+                types = [t['type'] for t in oneof if t['type'] != 'null']
+                if len(types) == 1:
+                    prop_type = types[0]
+                else:
+                    prop_type = types
+            elif 'anyOf' in prop_def:
+                anyof = prop_def['anyOf']
+                if any([item['type'] for item in anyof if 'type' in item]):
+                    types = [item['type'] for item in anyof if 'type' in item and item['type'] != 'object' and item['type'] != 'null']
+                    if len(types) == 1:
+                        prop_type = types[0]
+                    else:
+                        prop_type = types
+        if not prop_type and 'enum' not in list(prop_type) and '_definitions' in dm:
+            if prop in dm['_definitions']:
+                definition = dm['_definitions'][prop]
+                if 'type' not in p and 'enum' not in p and 'type' in definition:
+                    prop_type = definition['type']
+                elif 'type' not in p and 'enum' not in p and 'oneOf' in definition:
+                    oneof = definition['oneOf']
+                    oneof = [t for t in oneof if 'type' in t]
+                    types = [t['type'] for t in oneof if t['type'] != 'null']
+                    if len(types) == 1:
+                        prop_type = types[0]
+                    else:
+                        prop_type = types
+            elif 'ubiquitous_properties' in dm['_definitions'] and prop in dm['_definitions']['ubiquitous_properties']:
+                if 'type' in dm['_definitions']['ubiquitous_properties'][prop]:
+                    prop_type = dm['_definitions']['ubiquitous_properties'][prop]['type']
+                elif 'enum' in dm['_definitions']['ubiquitous_properties'][prop]:
+                    if include_enums:
+                        prop_type = {'enum':dm['_definitions']['ubiquitous_properties'][prop]['enum']}
+                    else:
+                        prop_type = 'enum'
+                elif 'term' in dm['_definitions']['ubiquitous_properties'][prop]:
+                    if 'type' in dm['_definitions']['ubiquitous_properties'][prop]:
+                        prop_type = dm['_definitions']['ubiquitous_properties'][prop]['type']
+                    elif 'oneOf' in dm['_definitions']['ubiquitous_properties'][prop]:
+                        oneof = dm['_definitions']['ubiquitous_properties'][prop]['oneOf']
+                        types = [t['type'] for t in oneof if t['type'] != 'null']
+                        if len(types) == 1:
+                            prop_type = types[0]
+                        else:
+                            prop_type = types
+            elif 'data_file_properties' in dm['_definitions'] and prop in dm['_definitions']['data_file_properties']:
+                if 'type' in dm['_definitions']['data_file_properties'][prop]:
+                    prop_type = dm['_definitions']['data_file_properties'][prop]['type']
+            elif '$ref' in prop_def:
+                ref = prop_def['$ref']
+                ref_prop = ref.split('/')[-1]
+                if ref_prop in dm['_definitions']:
+                    definition = dm['_definitions'][ref_prop]
+                    if 'type' in definition:
+                        prop_type = definition['type']
+                    elif 'enum' in definition:
+                        if include_enums:
+                            prop_type = {'enum':definition['enum']}
+                        else:
+                            prop_type = 'enum'
+                    elif 'oneOf' in definition:
+                        oneof = definition['oneOf']
+                        oneof = [t for t in oneof if 'type' in t]
+                        types = [t['type'] for t in oneof if t['type'] != 'null']
+                        if len(types) == 1:
+                            prop_type = types[0]
+                        else:
+                            prop_type = types
+        if prop_type == '':
+            print(f"\n\nNo type found for property: '{prop}' on node '{node}'!\n\n")
         return prop_type
+
+
+
+
+
+
+    def summarize_props_across_projects(
+        self,
+        tsv_dir,
+        dm,
+        prefix='',
+        outdir='.',
+        outlier_threshold=10,
+        omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type'],
+        omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
+        bin_limit=False,
+        write_report=True,
+        report_null=True,
+    ):
+        """
+        Returns a summary of data per node and property in the specified directory "tsv_dir".
+        For each property the total, non-null and null counts are returned across all projects.
+        For string, enumeration and boolean properties, bins and the number of unique bins are returned across all projects.
+        For integers and numbers, the mean, median, min, max, and stdev are returned across all projects.
+        Outliers in numeric data are identified using "+/- stdev". The cut-off for outlier identification can be changed by raising or lowering the outlier_threshold (common setting is ~3).
+
+        Args:
+            tsv_dir(str): project_tsvs directory
+            dd(dict): data dictionary of the commons result of func Gen3Submission.get_dictionary_all()
+            prefix(str): Default gets TSVs from all directories ending in "_tsvs". "prefix" of the project_tsvs directories (e.g., program name of the projects: "Program_1-Project_2_tsvs"). Result of running the Gen3Expansion.get_project_tsvs() function.
+            outlier_threshold(number): The upper/lower threshold for identifying outliers in numeric data is the standard deviation multiplied by this number.
+            omit_props(list): Properties to omit from being summarized. It doesn't make sense to summarize certain properties, e.g., those with all unique values. May want to omit: ['sample_id','specimen_number','current_medical_condition_name','medical_condition_name','imaging_results','medication_name'].
+            omit_nodes(list): Nodes in the data dictionary to omit from being summarized, e.g., program, project, data_release, root and metaschema.
+            outdir(str): A directory for the output files.
+            bin_limit(int or False): If an integer, limits the number of bins reported for string, enum, array and boolean properties to the specified number. Default is False (no limit).
+            write_report(bool): If True, writes the summary report to a TSV file in outdir. Default is True.
+            report_null(bool): If True, includes properties that are null in all projects. Default is True.
+        Examples:
+            s = summarize_props_across_projects(tsv_dir='project_tsvs/', dd=dd)
+        """
+        dir_pattern = "{}*{}".format(prefix, "tsvs")
+        project_dirs = glob.glob("{}/{}".format(tsv_dir, dir_pattern))
+        nn_nodes, nn_props, null_nodes, null_props, all_prop_ids = [], [], [], [], []
+        msg = "Summarizing TSVs in '{}':\n".format(tsv_dir)
+        print("\n\n{}".format(msg))
+
+        # Walk through nodes in dm and find TSVs in each project directory for that node
+        pdata = []
+        for node in [n for n in dm.keys() if n not in omit_nodes]:
+            node_pattern = f"*_{node}.tsv"
+            fnames = glob.glob(f"{tsv_dir}/*/{node_pattern}")
+            link_props = get_link_props(node,dm)
+            node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
+            if len(fnames) == 0:
+                # add node.prop to report as all null
+                for prop in node_props:
+                    prop_type = get_prop_type(prop, node, dm)
+                    pdata.append(
+                        {
+                            "prop_id": f"{node}.{prop}",
+                            "node": node,
+                            "property": prop,
+                            "type": prop_type,
+                            "N": 0,
+                            "nn": 0,
+                            "null": 0,
+                            "perc_null": 0,
+                            "all_null": True,
+                            "min": None,
+                            "max": None,
+                            "median": None,
+                            "mean": None,
+                            "stdev": None,
+                            "outliers": None,
+                            "bin_number": None,
+                            "bins": None,
+                            "projects": [],
+                        }
+                    )
+            else:                    
+                for fname in fnames:
+                    # open all TSVs for this node in all projects and concatenate them
+                    try: # note: using quotechar='`' below because some TSVs have unescaped quotes in exported TSV string data
+                        df = pd.read_csv(fname, sep="\t", header=0, dtype=str, engine='python', on_bad_lines='warn', quotechar='`')
+                    except Exception as e:
+                        print(f"Couldn't read TSV '{fname}' as a dataframe:\n\t{e}")
+                        df = pd.DataFrame()
+                    if df.empty:
+                        print(f"\t\t'{node}' TSV is empty. No data to summarize.\n")
+                    else:
+                        adf = pd.concat([adf,df]) if 'adf' in locals() else df
+                        nn_nodes.append(node)
+
+
+
+    return summary
+
+
+
+
+
+
+
+
 
     def summarize_dd(
         self,
@@ -3383,6 +3587,7 @@ class Gen3Expansion:
                             dds[node][prop] = prop
 
         return dds
+
 
     def summarize_tsvs(
         self,
@@ -3783,6 +3988,7 @@ class Gen3Expansion:
             print("\n\t{}".format(outname))
 
         return summary
+
 
     def compare_commons(
         self,
