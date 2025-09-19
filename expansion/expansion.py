@@ -3454,10 +3454,6 @@ class Gen3Expansion:
         return prop_type
 
 
-
-
-
-
     def summarize_props_across_projects(
         self,
         tsv_dir,
@@ -3544,10 +3540,39 @@ class Gen3Expansion:
                     else:
                         adf = pd.concat([adf,df]) if 'adf' in locals() else df
                         nn_nodes.append(node)
+                if adf.empty:
+                    print(f"\t\tNo data found for node '{node}' in any project TSVs.\n")
+                    # add each node.prop for empty node to report as all null
+                    for prop in node_props:
+                        prop_type = get_prop_type(prop, node, dm)
+                        pdata.append(
+                            {
+                                "prop_id": f"{node}.{prop}",
+                                "node": node,
+                                "property": prop,
+                                "type": prop_type,
+                                "N": 0,
+                                "nn": 0,
+                                "null": 0,
+                                "perc_null": 0,
+                                "all_null": True,
+                                "min": None,
+                                "max": None,
+                                "median": None,
+                                "mean": None,
+                                "stdev": None,
+                                "outliers": None,
+                                "bin_number": None,
+                                "bins": None,
+                                "projects": [],
+                            }
+                        )
+                else:
+                    # get stats for each node.prop
+                    
 
 
-
-    return summary
+        return summary
 
 
 
