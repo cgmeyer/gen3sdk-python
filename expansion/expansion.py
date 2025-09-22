@@ -3569,8 +3569,7 @@ class Gen3Expansion:
                         )
                 else:
                     # get stats for each node.prop
-                    
-
+                    print(f"\nSummarizing node '{node}' across {len(fnames)} project TSVs with {len(adf)} total records and {len(node_props)} properties (excluding links and omitted props).")
 
         return summary
 
