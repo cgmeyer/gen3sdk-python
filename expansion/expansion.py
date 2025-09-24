@@ -3765,8 +3765,6 @@ class Gen3Expansion:
                         null = prop_data.count(None)
                         nn = len(prop_data) - null
                         perc_null = round(100*null / len(prop_data) if len(prop_data) > 0 else 0, 2)
-
-                        # dict for the prop's row in report dataframe
                         prop_stats = {
                             "prop_id": prop_id,
                             "projects": prop_pids,
@@ -3848,9 +3846,9 @@ class Gen3Expansion:
                                 exit()
                         if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
                             prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
-                        report.append(prop_stats)
+                        pdata.append(prop_stats)
 
-        rdf = pd.DataFrame(report)
+        rdf = pd.DataFrame(pdata)
         if not report_null: # if report_null == False
             rdf = rdf.loc[rdf["all_null"] != True]
 
