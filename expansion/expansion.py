@@ -354,14 +354,94 @@ class Gen3Expansion:
 
 
 
-    def get_project_tsvs(
+    def export_project_data(
         self,
         project_ids=None,
         nodes=None,
-        outdir="project_tsvs",
+        outdir='project_data',
         overwrite=False,
         save_empty=False,
         remove_nodes=['program','project','root','data_release','metaschema','_terms','_settings','_definitions'],
+        save_format='json'
+    ):
+        """Function gets a JSON for every node in a specified project.
+            Exports JSON files into a directory "project_jsons/".
+            Function returns a list of the contents of the directory.
+        Args:
+            projects (str/list): The project_id(s) of the project(s) to download. Can be a single project_id or a list of project_ids.
+            nodes(str/list): The nodes to download from each project. If None, will try to download all nodes in the data model.
+            overwrite (boolean): If False, the JSON file != downloaded if there is an existing file with the same name.
+            save_empty(boolean): If True, JSONs with no records, i.e., downloads an empty JSON template, will be downloaded.
+            remove_nodes(list): A list of nodes in the data model that should not be downloaded per project.
+        Example:
+        >>> export_project_data(projects = ['internal-test'])
+
+        """
+        if nodes == None:
+            dd = self.sub.get_dictionary_all()
+            nodes = sorted([n for n in list(set(dd)) if n not in remove_nodes])
+        elif isinstance(nodes, str):
+            nodes = [nodes]
+        elif not isinstance(nodes, list):
+            raise Gen3Error("nodes must be a list of node names or a single node name")
+
+        if project_ids == None:  # if no projects specified, get node for all projects
+            project_ids = sorted(list(
+                pd.json_normalize(
+                    self.sub.query("""{project (first:0){project_id}}""")["data"][
+                        "project"
+                    ]
+                )["project_id"]
+            ))
+        elif isinstance(project_ids, str):
+            project_ids = [project_ids]
+
+        for i in range(0,len(project_ids)):
+            project_id = project_ids[i]
+            prog, proj = project_id.split("-", 1)
+            print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading data for project...")
+            mydir = "{}/{}_{save_format}s".format(outdir, project_id)  # create the directory to store data exports
+            if not os.path.exists(mydir):
+                os.makedirs(mydir)
+            # get node counts for the project and subset to nodes with >0 records
+            node_counts = {}
+            counts = self.get_node_counts(nodes, project_id=project_id)
+            for node in counts:
+                filename = f"{mydir}/{project_id}_{node}.{save_format}"
+                if (os.path.isfile(filename)) and (overwrite == False):
+                    print(f"\t'{node}': Previously downloaded: '{filename}'")
+                else:
+                    count = counts[node]
+                    if count > 0 or save_empty == True:
+                        print(f"\t'{node}': {count} records. Downloading...")
+                        f = StringIO()
+                        with redirect_stdout(f):
+                            self.sub.export_node(prog, proj, node, save_format, filename)
+                    else:
+                        print(f"\t'{node}': {count} records. Skipping.")
+
+        cmd = ["ls", mydir]  # look in the download directory
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode(
+                "UTF-8"
+            )
+        except Exception as e:
+            output = "ERROR:" + e.output.decode("UTF-8")
+        return output
+
+
+
+
+
+    def get_project_tsvs(
+        self,
+        projects=None,
+        nodes=None,
+        outdir='project_tsvs',
+        overwrite=False,
+        save_empty=False,
+        remove_nodes=['program','project','root','data_release','metaschema','_terms','_settings','_definitions'],
+        save_format='tsv'
     ):
         """Function gets a TSV for every node in a specified project.
             Exports TSV files into a directory "project_tsvs/".
@@ -398,15 +478,15 @@ class Gen3Expansion:
         for i in range(0,len(project_ids)):
             project_id = project_ids[i]
             prog, proj = project_id.split("-", 1)
-            print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading TSVs for project...")
-            mydir = "{}/{}_tsvs".format(outdir, project_id)  # create the directory to store TSVs
+            print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading data for project...")
+            mydir = "{}/{}_tsvs".format(outdir, project_id)  # create the directory to store data exports
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
             # get node counts for the project and subset to nodes with >0 records
             node_counts = {}
             counts = self.get_node_counts(nodes, project_id=project_id)
             for node in counts:
-                filename = str(mydir + "/" + project_id + "_" + node + ".tsv")
+                filename = f"{mydir}/{project_id}_{node}.{save_format}"
                 if (os.path.isfile(filename)) and (overwrite == False):
                     print(f"\t'{node}': Previously downloaded: '{filename}'")
                 else:
@@ -415,7 +495,7 @@ class Gen3Expansion:
                         print(f"\t'{node}': {count} records. Downloading...")
                         f = StringIO()
                         with redirect_stdout(f):
-                            self.sub.export_node(prog, proj, node, "tsv", filename)
+                            self.sub.export_node(prog, proj, node, save_format, filename)
                     else:
                         print(f"\t'{node}': {count} records. Skipping.")
 
@@ -3454,11 +3534,47 @@ class Gen3Expansion:
         return prop_type
 
 
+
+    def get_link_props(self, node, dd):
+        """ Takes a Gen3 data dictionary node definition and returns a list of link property names (e.g., "studies" and "subjects").
+        """
+        node_def = dd[node]
+        links = node_def['links']
+        link_props = []
+        for link in links: # link = links[0]
+                if 'name' in link: # if link is from a Gen3 dd node_def
+                    link_props.append(link['name'])
+                elif 'subgroup' in link: # if subgroup from Gen3 dd node_def
+                    sub_links = list(link['subgroup'])
+                    for sub_link in sub_links: # sub_link = sub_links[0]
+                        if 'name' in sub_link:
+                            link_props.append(sub_link['name'])
+                        elif 'subgroup' in sub_link:
+                            sub_sub_links = list(sub_link['subgroup'])
+                            for sub_sub_link in sub_sub_links:
+                                if 'name' in sub_sub_link:
+                                    link_props.append(sub_sub_link['name'])
+                                elif 'subgroup' in sub_sub_link:
+                                    sub_sub_sub_links = list(sub_sub_link['subgroup'])
+                                    for sub_sub_sub_link in sub_sub_sub_links:
+                                        if 'name' in sub_sub_sub_link:
+                                            link_props.append(sub_sub_sub_link['name'])
+                                        else:
+                                            print(f"Strangely deeply nested subgroup for node {node_def['id']}")
+                elif isinstance(links[link], list): # if links are from master_dd node_def
+                        for l in links[link]:
+                            link_props.append(l['name'])
+                        link_props = list(set(link_props))
+                else:
+                    print("\tNo links in node definition: '{}'".format(link))
+        return link_props
+
+
+
     def summarize_props_across_projects(
         self,
-        tsv_dir,
+        data_dir,
         dm,
-        prefix='',
         outdir='.',
         outlier_threshold=10,
         omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type'],
@@ -3466,18 +3582,18 @@ class Gen3Expansion:
         bin_limit=False,
         write_report=True,
         report_null=True,
+        save_format='json'
     ):
         """
-        Returns a summary of data per node and property in the specified directory "tsv_dir".
+        Returns a summary of data per node and property in the specified data directory containing sheepdog exports (using "exp.export_sheepdog_data()").
         For each property the total, non-null and null counts are returned across all projects.
         For string, enumeration and boolean properties, bins and the number of unique bins are returned across all projects.
         For integers and numbers, the mean, median, min, max, and stdev are returned across all projects.
         Outliers in numeric data are identified using "+/- stdev". The cut-off for outlier identification can be changed by raising or lowering the outlier_threshold (common setting is ~3).
 
         Args:
-            tsv_dir(str): project_tsvs directory
+            data_dir(str): data export directory
             dd(dict): data dictionary of the commons result of func Gen3Submission.get_dictionary_all()
-            prefix(str): Default gets TSVs from all directories ending in "_tsvs". "prefix" of the project_tsvs directories (e.g., program name of the projects: "Program_1-Project_2_tsvs"). Result of running the Gen3Expansion.get_project_tsvs() function.
             outlier_threshold(number): The upper/lower threshold for identifying outliers in numeric data is the standard deviation multiplied by this number.
             omit_props(list): Properties to omit from being summarized. It doesn't make sense to summarize certain properties, e.g., those with all unique values. May want to omit: ['sample_id','specimen_number','current_medical_condition_name','medical_condition_name','imaging_results','medication_name'].
             omit_nodes(list): Nodes in the data dictionary to omit from being summarized, e.g., program, project, data_release, root and metaschema.
@@ -3486,19 +3602,19 @@ class Gen3Expansion:
             write_report(bool): If True, writes the summary report to a TSV file in outdir. Default is True.
             report_null(bool): If True, includes properties that are null in all projects. Default is True.
         Examples:
-            s = summarize_props_across_projects(tsv_dir='project_tsvs/', dd=dd)
+            s = summarize_props_across_projects(data_dir='sheepdog_exports/', dd=dd)
         """
-        dir_pattern = "{}*{}".format(prefix, "tsvs")
-        project_dirs = glob.glob("{}/{}".format(tsv_dir, dir_pattern))
+        dir_pattern = f"*_{save_format}s"
+        project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
         nn_nodes, nn_props, null_nodes, null_props, all_prop_ids = [], [], [], [], []
-        msg = "Summarizing TSVs in '{}':\n".format(tsv_dir)
+        msg = "Summarizing sheepdog data exports in '{}':\n".format(data_dir)
         print("\n\n{}".format(msg))
 
-        # Walk through nodes in dm and find TSVs in each project directory for that node
+        # Walk through nodes in dm and find exported data (json or tsv) in each project directory for that node
         pdata = []
         for node in [n for n in dm.keys() if n not in omit_nodes]:
-            node_pattern = f"*_{node}.tsv"
-            fnames = glob.glob(f"{tsv_dir}/*/{node_pattern}")
+            node_pattern = f"*_{node}.{save_format}"
+            fnames = glob.glob(f"{data_dir}/*/{node_pattern}")
             link_props = get_link_props(node,dm)
             node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
             if len(fnames) == 0:
@@ -3529,9 +3645,12 @@ class Gen3Expansion:
                     )
             else:                    
                 for fname in fnames:
-                    # open all TSVs for this node in all projects and concatenate them
-                    try: # note: using quotechar='`' below because some TSVs have unescaped quotes in exported TSV string data
-                        df = pd.read_csv(fname, sep="\t", header=0, dtype=str, engine='python', on_bad_lines='warn', quotechar='`')
+                    # open all files for this node across all projects and concatenate them
+                    try: # note: using quotechar='`' below because some files have unescaped quotes in exported string data
+                        if save_format == 'json':
+                            df = pd.read_json(fname, dtype=str)
+                        elif save_format == 'tsv':
+                            df = pd.read_csv(fname, sep="\t", header=0, dtype=str, engine='python', on_bad_lines='warn', quotechar='`')
                     except Exception as e:
                         print(f"Couldn't read TSV '{fname}' as a dataframe:\n\t{e}")
                         df = pd.DataFrame()
@@ -3539,10 +3658,10 @@ class Gen3Expansion:
                         print(f"\t\t'{node}' TSV is empty. No data to summarize.\n")
                     else:
                         adf = pd.concat([adf,df]) if 'adf' in locals() else df
-                        nn_nodes.append(node)
                 if adf.empty:
                     print(f"\t\tNo data found for node '{node}' in any project TSVs.\n")
-                    # add each node.prop for empty node to report as all null
+                    # add each node.prop for empty node to report node/props as all null
+                    null_nodes.append(node)
                     for prop in node_props:
                         prop_type = get_prop_type(prop, node, dm)
                         pdata.append(
@@ -3570,8 +3689,260 @@ class Gen3Expansion:
                 else:
                     # get stats for each node.prop
                     print(f"\nSummarizing node '{node}' across {len(fnames)} project TSVs with {len(adf)} total records and {len(node_props)} properties (excluding links and omitted props).")
+                    nn_nodes.append(node)
+                    for prop in node_props:  # prop=props[0]
+                        prop_name = "{}.{}".format(node, prop)
+                        print(prop_name)
+                        null = adf.loc[adf[prop].isnull()]
+                        # looks like adf has some bad lines in it, maybe delimiter issue
+                        adf.to_csv('adf_debug.tsv',sep='\t',index=False)
+                        pid = "parent-GenSalt_DS-HCR-IRB_"
+                        prog, proj = pid.split("-",1)
+                        sub.export_node(prog, proj, "study", "tsv", "filename")
+
+
+
+
+
+
+
+                        nn = adf.loc[adf[prop].notnull()]
+                        perc_null = len(null)/len(adf)
+                        ptype = self.get_prop_type(node, prop, dd)
+
+                        # dict for the prop's row in report dataframe
+                        prop_stats = {
+                            "prop_id": prop_id,
+                            "project_id": project_id,
+                            "node": node,
+                            "property": prop,
+                            "type": ptype,
+                            "N": len(df),
+                            "nn": len(nn),
+                            "null": len(null),
+                            "perc_null": perc_null,
+                            "all_null": np.nan,
+                            "min": np.nan,
+                            "max": np.nan,
+                            "median": np.nan,
+                            "mean": np.nan,
+                            "stdev": np.nan,
+                            "outliers": np.nan,
+                            "bin_number": np.nan,
+                            "bins": np.nan,
+                        }
+
+                        if nn.empty:
+                            null_props.append(prop_name)
+                            prop_stats["all_null"] = True
+
+                        else:
+                            nn_props.append(prop_name)
+                            all_prop_ids.append(prop_id)
+                            prop_stats["all_null"] = False
+
+                            msg = "\t'{}'".format(prop_id)
+                            sys.stdout.write("\r" + str(msg).ljust(200, " "))
+
+                            if ptype in ["string", "enum", "array", "boolean", "date"]:
+
+                                if ptype == "array":
+
+                                    all_bins = list(nn[prop])
+                                    bin_list = [
+                                        bin_txt.split(",") for bin_txt in list(nn[prop])
+                                    ]
+                                    counts = Counter(
+                                        [
+                                            item
+                                            for sublist in bin_list
+                                            for item in sublist
+                                        ]
+                                    )
+
+                                elif ptype in ["string", "enum", "boolean", "date"]:
+
+                                    counts = Counter(nn[prop])
+
+                                df1 = pd.DataFrame.from_dict(
+                                    counts, orient="index"
+                                ).reset_index()
+                                bins = [tuple(x) for x in df1.values]
+                                bins = sorted(
+                                    sorted(bins, key=lambda x: (x[0])),
+                                    key=lambda x: (x[1]),
+                                    reverse=True,
+                                )  # sort first by name, then by value. This way, names with same value are in same order.
+
+                                prop_stats["bins"] = bins
+                                prop_stats["bin_number"] = len(bins)
+
+                            # Get stats for numbers
+                            elif ptype in ["number", "integer"]:  # prop='concentration'
+
+                                # make a list of the data values as floats (converted from strings)
+                                nn_all = nn[prop]
+                                d_all = list(nn_all)
+
+                                nn_num = (
+                                    nn[prop]
+                                    .apply(pd.to_numeric, errors="coerce")
+                                    .dropna()
+                                )
+                                d = list(nn_num)
+
+                                nn_string = nn.loc[~nn[prop].isin(list(map(str, d)))]
+                                non_numbers = list(nn_string[prop])
+
+                                if (
+                                    len(d) > 0
+                                ):  # if there are numbers in the data, calculate numeric stats
+
+                                    # calculate summary stats using the float list d
+                                    mean = statistics.mean(d)
+                                    median = statistics.median(d)
+                                    minimum = min(d)
+                                    maximum = max(d)
+
+                                    if (
+                                        len(d) == 1
+                                    ):  # if only one value, no stdev and no outliers
+                                        std = "NA"
+                                        outliers = []
+                                    else:
+                                        std = statistics.stdev(d)
+                                        # Get outliers by mean +/- outlier_threshold * stdev
+                                        cutoff = (
+                                            std * outlier_threshold
+                                        )  # three times the standard deviation is default
+                                        lower, upper = (
+                                            mean - cutoff,
+                                            mean + cutoff,
+                                        )  # cut-offs for outliers is 3 times the stdev below and above the mean
+                                        outliers = sorted(
+                                            list(
+                                                set(
+                                                    [
+                                                        x
+                                                        for x in d
+                                                        if x < lower or x > upper
+                                                    ]
+                                                )
+                                            )
+                                        )
+
+                                    # if property type is 'integer', change min, max, median to int type
+                                    if ptype == "integer":
+                                        median = int(median)  # median
+                                        minimum = int(minimum)  # min
+                                        maximum = int(maximum)  # max
+                                        outliers = [
+                                            int(i) for i in outliers
+                                        ]  # convert outliers from float to int
+
+                                    prop_stats["stdev"] = std
+                                    prop_stats["mean"] = mean
+                                    prop_stats["median"] = median
+                                    prop_stats["min"] = minimum
+                                    prop_stats["max"] = maximum
+                                    prop_stats["outliers"] = outliers
+
+                                # check if numeric property is mixed with strings, and if so, summarize the string data
+                                if len(d_all) > len(d):
+
+                                    msg = "\t\tFound {} string values among the {} records of prop '{}' with value(s): {}. Calculating stats only for the {} numeric values.".format(
+                                        len(non_numbers),
+                                        len(nn),
+                                        prop,
+                                        list(set(non_numbers)),
+                                        len(d),
+                                    )
+                                    print("\n\t{}\n".format(msg))
+
+                                    prop_stats["type"] = "mixed {},string".format(ptype)
+
+                                    counts = Counter(nn_string[prop])
+                                    df1 = pd.DataFrame.from_dict(
+                                        counts, orient="index"
+                                    ).reset_index()
+                                    bins = [tuple(x) for x in df1.values]
+                                    bins = sorted(
+                                        sorted(bins, key=lambda x: (x[0])),
+                                        key=lambda x: (x[1]),
+                                        reverse=True,
+                                    )
+                                    prop_stats["bins"] = bins
+                                    prop_stats["bin_number"] = len(bins)
+
+                            else:  # If its not in the list of ptypes, exit. Need to add array handling.
+                                print(
+                                    "\t\t\n\n\n\nUnhandled property type!\n\n '{}': {}\n\n\n\n".format(
+                                        prop_id, ptype
+                                    )
+                                )
+                                exit()
+
+                        if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
+                            prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
+
+                        #report = report.append(prop_stats, ignore_index=True)
+                        # print("\n{}\n".format(report))
+                        # print("\n{}\n".format(prop_stats))
+                        pdf = pd.DataFrame.from_records([prop_stats])
+                        pdf['all_null'] = pdf['all_null'].astype(bool)
+                        report = pd.concat([report,pdf])
+
+
+        if not report_null: # if report_null == False
+            report = report.loc[report["all_null"] != True]
+
+        # strip the col names so we can sort the report
+        report.columns = report.columns.str.strip()
+        report.sort_values(by=["all_null", "node", "property"], inplace=True)
+
+        summary["report"] = report
+        summary["all_prop_ids"] = all_prop_ids
+
+        # summarize all properties
+        nn_props = sorted(list(set(nn_props)))
+        summary["nn_props"] = nn_props
+
+        null_props = [prop for prop in null_props if prop not in nn_props]
+        summary["null_props"] = sorted(list(set(null_props)))
+
+        # summarize all nodes
+        nn_nodes = sorted(list(set(nn_nodes)))
+        summary["nn_nodes"] = nn_nodes
+
+        dd_regex = re.compile(r"[^_][A-Za-z0-9_]+")
+        dd_nodes = list(filter(dd_regex.match, list(dd)))
+        dd_nodes = [node for node in dd_nodes if node not in omit_nodes]
+        null_nodes = [node for node in dd_nodes if node not in nn_nodes]
+
+        summary["null_nodes"] = null_nodes
+
+        if write_report: # write_report == True
+
+            self.create_output_dir(outdir=outdir)
+
+            if "/" in tsv_dir:
+                names = tsv_dir.split("/")
+                names = [name for name in names if name != ""]
+                name = names[-1]
+            else:
+                name = tsv_dir
+
+            outname = "data_summary_{}.tsv".format(name)
+            outname = "{}/{}".format(
+                outdir, outname
+            )  # ./data_summary_prod_tsvs_04272020.tsv
+
+            report.to_csv(outname, sep="\t", index=False, encoding="utf-8")
+            sys.stdout.write("\rReport written to file:".ljust(200, " "))
+            print("\n\t{}".format(outname))
 
         return summary
+
 
 
 
