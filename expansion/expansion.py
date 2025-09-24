@@ -3670,7 +3670,7 @@ class Gen3Expansion:
             if len(fnames) == 0:
                 # add node.prop to report as all null
                 for prop in node_props:
-                    prop_type = get_prop_type(prop, node, dm)
+                    prop_type = self.get_prop_type(prop, node, dm)
                     pdata.append(
                         {
                             "prop_id": f"{node}.{prop}",
@@ -3719,7 +3719,7 @@ class Gen3Expansion:
                     # add each node.prop for empty node to report node/props as all null
                     null_nodes.append(node)
                     for prop in node_props:
-                        prop_type = get_prop_type(prop, node, dm)
+                        prop_type = self.get_prop_type(prop, node, dm)
                         pdata.append(
                             {
                                 "prop_id": f"{node}.{prop}",
