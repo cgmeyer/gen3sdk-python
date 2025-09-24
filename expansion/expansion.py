@@ -3460,14 +3460,13 @@ class Gen3Expansion:
                             item_types = [t for t in item_type if t not in ['null','object']]
                             if len(item_types) == 1:
                                 item_type = item_types[0]
-                        prop_type = 'array of {}'.format(item_type)
+                        prop_type = {'array': item_type}
                     elif 'items' in prop_def and 'enum' in prop_def['items']:
                         if include_enums:
                             item_type = {'enum':prop_def['items']['enum']}
                             prop_type = {'array': item_type}
                         else:
-                            item_type = 'enum'
-                            prop_type = {'array': item_type}
+                            prop_type = {'array': 'enum'}
                     elif 'items' in prop_def and '$ref' in prop_def['items']:
                         ref = prop_def['items']['$ref']
                         refs = ref.split('/')
