@@ -3794,7 +3794,7 @@ class Gen3Expansion:
                             prop_stats["all_null"] = False
                             msg = "\t'{}'".format(prop_id)
                             sys.stdout.write("\r" + str(msg).ljust(200, " "))
-                            if ptype in ["string", "enum", "boolean", "date"]:
+                            if ptype in ["string", "boolean", "date"] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 counts = Counter([d for d in prop_data if d not in [None, ""]])
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
                                 bins = [tuple(x) for x in cdf.values]
