@@ -3880,7 +3880,7 @@ class Gen3Expansion:
                 name = data_dir
             outname = f"data_summary_{name}.tsv"
             outname = f"{outdir}/{outname}"
-            report.to_csv(outname, sep="\t", index=False, encoding="utf-8")
+            rdf.to_csv(outname, sep="\t", index=False, encoding="utf-8")
             sys.stdout.write("\rReport written to file:".ljust(200, " "))
             print(f"\n\t{outname}")
 
