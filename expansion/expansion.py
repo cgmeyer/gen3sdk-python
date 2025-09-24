@@ -3642,7 +3642,7 @@ class Gen3Expansion:
 
         Args:
             data_dir(str): data export directory
-            dd(dict): data dictionary of the commons result of func Gen3Submission.get_dictionary_all()
+            dm(dict): data model of the commons result of func Gen3Submission.get_dictionary_all()
             outlier_threshold(number): The upper/lower threshold for identifying outliers in numeric data is the standard deviation multiplied by this number.
             omit_props(list): Properties to omit from being summarized. It doesn't make sense to summarize certain properties, e.g., those with all unique values. May want to omit: ['sample_id','specimen_number','current_medical_condition_name','medical_condition_name','imaging_results','medication_name'].
             omit_nodes(list): Nodes in the data dictionary to omit from being summarized, e.g., program, project, data_release, root and metaschema.
@@ -3665,7 +3665,7 @@ class Gen3Expansion:
         for node in report_nodes:
             node_pattern = f"*_{node}.{save_format}"
             fnames = glob.glob(f"{data_dir}/*/{node_pattern}")
-            link_props = get_link_props(node,dm)
+            link_props = self.get_link_props(node,dm)
             node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
             if len(fnames) == 0:
                 # add node.prop to report as all null
