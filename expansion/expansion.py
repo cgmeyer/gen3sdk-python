@@ -3651,7 +3651,7 @@ class Gen3Expansion:
             write_report(bool): If True, writes the summary report to a TSV file in outdir. Default is True.
             report_null(bool): If True, includes properties that are null in all projects. Default is True.
         Examples:
-            s = summarize_props_across_projects(data_dir='sheepdog_exports/', dd=dd)
+            s = summarize_props_across_projects(data_dir='prod_jsons/', dm=dm)
         """
         dir_pattern = f"*_{save_format}s"
         project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
@@ -3750,7 +3750,7 @@ class Gen3Expansion:
                         prop_id = f"{node}.{prop}"
                         print(prop_id)
                         # Get node_prop data
-                        ptype = self.get_prop_type(prop, node, dd)
+                        ptype = self.get_prop_type(prop, node, dm)
                         if save_format == 'json':
                             if ptype == 'string':
                                 prop_data = [d.get(prop, None) for d in all_data]
