@@ -3851,11 +3851,11 @@ class Gen3Expansion:
         rdf = pd.DataFrame(pdata)
         if not report_null: # if report_null == False
             rdf = rdf.loc[rdf["all_null"] != True]
-
-        # strip the col names so we can sort the report
-        rdf.columns = rdf.columns.str.strip()
+        rdf.columns = rdf.columns.str.strip() # strip the col names so we can sort the report
         rdf.sort_values(by=["all_null", "node", "property"], inplace=True)
+        rdf.reset_index(drop=True, inplace=True)        
 
+        summary = {}
         summary["report"] = rdf
         summary["all_prop_ids"] = all_prop_ids
 
@@ -3875,7 +3875,7 @@ class Gen3Expansion:
         if write_report: # write_report == True
             self.create_output_dir(outdir=outdir)
             if "/" in data_dir:
-                names = data_dir.split("/")[-1]
+                name = data_dir.split("/")[-1]
             else:
                 name = data_dir
             outname = f"data_summary_{name}.tsv"
