@@ -435,7 +435,7 @@ class Gen3Expansion:
 
     def get_project_tsvs(
         self,
-        projects=None,
+        project_ids=None,
         nodes=None,
         outdir='project_tsvs',
         overwrite=False,
@@ -447,13 +447,13 @@ class Gen3Expansion:
             Exports TSV files into a directory "project_tsvs/".
             Function returns a list of the contents of the directory.
         Args:
-            projects (str/list): The project_id(s) of the project(s) to download. Can be a single project_id or a list of project_ids.
+            project_ids (str/list): The project_id(s) of the project(s) to download. Can be a single project_id or a list of project_ids.
             nodes(str/list): The nodes to download from each project. If None, will try to download all nodes in the data model.
             overwrite (boolean): If False, the TSV file != downloaded if there is an existing file with the same name.
             save_empty(boolean): If True, TSVs with no records, i.e., downloads an empty TSV template, will be downloaded.
             remove_nodes(list): A list of nodes in the data model that should not be downloaded per project.
         Example:
-        >>> get_project_tsvs(projects = ['internal-test'])
+        >>> get_project_tsvs(project_ids = ['internal-test'])
 
         """
         if nodes == None:
@@ -464,7 +464,7 @@ class Gen3Expansion:
         elif not isinstance(nodes, list):
             raise Gen3Error("nodes must be a list of node names or a single node name")
 
-        if project_ids == None:  # if no projects specified, get node for all projects
+        if project_ids == None:  # if no project_ids specified, get node for all projects
             project_ids = sorted(list(
                 pd.json_normalize(
                     self.sub.query("""{project (first:0){project_id}}""")["data"][
