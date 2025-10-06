@@ -464,21 +464,21 @@ class Gen3Expansion:
         elif not isinstance(nodes, list):
             raise Gen3Error("nodes must be a list of node names or a single node name")
 
-        if project_ids == None:  # if no projects specified, get node for all projects
-            project_ids = sorted(list(
+        if projects == None:  # if no projects specified, get node for all projects
+            projects = sorted(list(
                 pd.json_normalize(
                     self.sub.query("""{project (first:0){project_id}}""")["data"][
                         "project"
                     ]
                 )["project_id"]
             ))
-        elif isinstance(project_ids, str):
-            project_ids = [project_ids]
+        elif isinstance(projects, str):
+            projects = [projects]
 
-        for i in range(0,len(project_ids)):
-            project_id = project_ids[i]
+        for i in range(0,len(projects)):
+            project_id = projects[i]
             prog, proj = project_id.split("-", 1)
-            print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading data for project...")
+            print(f"\n{i+1}/{len(projects)}: '{project_id}' Downloading data for project...")
             mydir = "{}/{}_tsvs".format(outdir, project_id)  # create the directory to store data exports
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
