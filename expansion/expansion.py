@@ -152,8 +152,23 @@ class Gen3Expansion:
                 print("ERROR:" + output)
         print("Finished")
 
-    # Functions for downloading metadata in TSVs
 
+    # basic functions
+    def read_json(self,json_file):
+        """ Reads in json file and returns a Python dictionary.
+        """
+        with open(json_file) as json_file:
+            try:
+                dictionary = json.load(json_file)
+            except Exception as e:
+                print(f"Error reading schema file: {json_file}: \n\t{e}")
+                return {}
+        return dictionary
+
+
+
+
+    # Functions for downloading metadata
     def get_project_ids(self, node=None, name=None):
         """Get a list of project_ids you have access to in a data commons.
 
