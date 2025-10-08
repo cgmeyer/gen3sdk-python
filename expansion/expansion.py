@@ -165,8 +165,15 @@ class Gen3Expansion:
                 return {}
         return dictionary
 
-
-
+    def write_json(self, data, outfile):
+        """ Writes a Python dictionary to a JSON file.
+        """
+        try:
+            with open(outfile, 'w') as f:
+                json.dump(data, f, indent=4)
+            print(f"JSON written to file: {outfile}")
+        except Exception as e:
+            print(f"Error writing JSON to file: {outfile}: \n\t{e}")
 
     # Functions for downloading metadata
     def get_project_ids(self, node=None, name=None):
