@@ -3827,8 +3827,8 @@ class Gen3Expansion:
                             nn_props.append(prop_id)
                             all_prop_ids.append(prop_id)
                             prop_stats["all_null"] = False
-                            msg = "\t'{}'".format(prop_id)
-                            sys.stdout.write("\r" + str(msg).ljust(200, " "))
+                            # msg = "\t'{}'".format(prop_id)
+                            # sys.stdout.write("\r" + str(msg).ljust(200, " "))
                             if ptype in ["string", "boolean", "date"] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 counts = Counter(prop_data)
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
