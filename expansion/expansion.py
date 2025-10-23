@@ -3833,8 +3833,6 @@ class Gen3Expansion:
                                 counts = Counter(prop_data)
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
                                 bins = [tuple(x) for x in cdf.values]
-
-
                                 try:
                                     bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
                                 except Exception as e:
@@ -3844,11 +3842,7 @@ class Gen3Expansion:
                                     return prop_data
                                 prop_stats["bins"] = bins
                                 prop_stats["bin_number"] = len(bins)
-                            
-                            
-                            
                             elif ptype in ["number", "integer"]:  # node = 'demographic', prop='age_at_index'
-
                                 if ptype == "integer":
                                     d = [int(x) for x in prop_data]
                                 else:
@@ -3878,15 +3872,12 @@ class Gen3Expansion:
                                     print(f"\tfirst 10 values for {node}.{prop}: {list(set(d))[:10]}\n\n")
                                     print(f"\n\n\tError: returning 'd' for '{node}.{prop}' inspection")
                                     return prop_data
-                                
-
                                 prop_stats["stdev"] = std
                                 prop_stats["mean"] = mean
                                 prop_stats["median"] = median
                                 prop_stats["min"] = minimum
                                 prop_stats["max"] = maximum
                                 prop_stats["outliers"] = outliers
-
                             elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
                                 #if isinstance(ptype, dict) and 'enum' in ptype['array'] or 'string' in ptype['array']:
                                     # sort each list by values and then make comma-separated lists for binning
@@ -3910,7 +3901,6 @@ class Gen3Expansion:
                             elif len(prop_stats["bins"]) > int(bin_limit):
                                 prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
                         pdata.append(prop_stats)
-
         rdf = pd.DataFrame(pdata)
         if not report_null: # if report_null == False
             rdf = rdf.loc[rdf["all_null"] != True]
