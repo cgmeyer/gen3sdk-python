@@ -3880,8 +3880,13 @@ class Gen3Expansion:
                                 prop_stats["outliers"] = outliers
                             elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
                                 #if isinstance(ptype, dict) and 'enum' in ptype['array'] or 'string' in ptype['array']:
-                                    # sort each list by values and then make comma-separated lists for binning
-                                joined_data = [','.join(sorted(v)) for v in prop_data if isinstance(v, list) and len(v) > 0]
+                                # sort each list by values and then make comma-separated lists for binning
+                                """
+                                {'array': 'number'},
+                                {'array': {'enum': [
+                                {'array': 'string'},
+                                """
+                                joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
                                 counts = Counter(joined_data)
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
                                 bins = [tuple(x) for x in cdf.values]
