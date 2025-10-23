@@ -3649,7 +3649,7 @@ class Gen3Expansion:
         outlier_threshold=10,
         omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type'],
         omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
-        bin_limit=False,
+        bin_limit='5%',
         write_report=True,
         report_null=True,
         save_format='json'
@@ -3668,7 +3668,7 @@ class Gen3Expansion:
             omit_props(list): Properties to omit from being summarized. It doesn't make sense to summarize certain properties, e.g., those with all unique values. May want to omit: ['sample_id','specimen_number','current_medical_condition_name','medical_condition_name','imaging_results','medication_name'].
             omit_nodes(list): Nodes in the data dictionary to omit from being summarized, e.g., program, project, data_release, root and metaschema.
             outdir(str): A directory for the output files.
-            bin_limit(int or False): If an integer, limits the number of bins reported for string, enum, array and boolean properties to the specified number. Default is False (no limit).
+            bin_limit(str, int or False): If a string ending with %, adds bins based on whether they exceed the specified percentage of the total. If an integer, limits the number of bins reported for string, enum, array and boolean properties to the specified number. Default is 5%. Set to False for no limit. If all vals are unique, with a 5% bin_limit, there will be at most 20 bins (each with 1 value).
             write_report(bool): If True, writes the summary report to a TSV file in outdir. Default is True.
             report_null(bool): If True, includes properties that are null in all projects. Default is True.
         Examples:
@@ -3781,18 +3781,23 @@ class Gen3Expansion:
                         ptype = self.get_prop_type(prop, node, dm)
                         if save_format == 'json':
                             if ptype == 'string':
-                                prop_data = [d.get(prop, None) for d in all_data]
-                                prop_data = [d.replace('\n','').replace('\t','') if d not in [None, ""] else None for d in prop_data]
+                                prop_data = [d.get(prop, np.nan) for d in all_data]
+                                prop_data = [d.replace('\n','').replace('\t','') if d not in [np.nan, None, ""] else np.nan for d in prop_data]
                             else:
-                                prop_data = [d.get(prop, None) for d in all_data]
-                            prop_pids = sorted(list(set([d.get("project_id", None) for d in all_data])))
+                                prop_data = [d.get(prop, np.nan) for d in all_data]
+                            prop_pids = sorted(list(set([d.get("project_id", np.nan) for d in all_data])))
                         elif save_format == 'tsv':
-                            prop_data = list(all_data.get(prop, [None]*len(all_data)))
-                            prop_pids = sorted(list(set(all_data.get("project_id", [None]*len(all_data)))))
+                            prop_data = list(all_data.get(prop, [np.nan]*len(all_data)))
+                            prop_pids = sorted(list(set(all_data.get("project_id", [np.nan]*len(all_data)))))
                         # count number of None
-                        null = prop_data.count(None)
-                        nn = len(prop_data) - null
-                        perc_null = round(100*null / len(prop_data) if len(prop_data) > 0 else 0, 2)
+                        null = sum(1 for d in prop_data if str(d) in ['nan','None',''])
+                        nn = sum(1 for d in prop_data if str(d) not in ['nan','None',''])
+                        total = len(prop_data)
+                        if nn + null != total:
+                            print(f"\n\n Total count ({total}) not equal to the null count ({null}) plus non-null count ({nn}) for '{node}.{prop}'!\n\n")
+                            print("\n\n\t\tReturning 'prop_data' for inspection.")
+                            return prop_data
+                        perc_null = round(100*null / total if total > 0 else 0, 2)
                         prop_stats = {
                             "prop_id": prop_id,
                             "projects": prop_pids,
@@ -3817,40 +3822,64 @@ class Gen3Expansion:
                             null_props.append(prop_id)
                             prop_stats["all_null"] = True
                         else:
+                            prop_data = [x for x in prop_data if str(x) not in ['nan','None','']]
+                            #print(f"{node} {prop}")
                             nn_props.append(prop_id)
                             all_prop_ids.append(prop_id)
                             prop_stats["all_null"] = False
                             msg = "\t'{}'".format(prop_id)
                             sys.stdout.write("\r" + str(msg).ljust(200, " "))
                             if ptype in ["string", "boolean", "date"] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
-                                counts = Counter([d for d in prop_data if d not in [None, ""]])
+                                counts = Counter(prop_data)
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
                                 bins = [tuple(x) for x in cdf.values]
-                                bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
+
+
+                                try:
+                                    bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
+                                except Exception as e:
+                                    print(f"\n\nCould not sort bins for property '{prop}' of type '{ptype}': {e}\n\n")
+                                    print(f"\tfirst 10 values for {node}.{prop}: {list(set(prop_data))[:10]}\n\n")
+                                    print(f"\n\n\tError: returning 'prop_data' for '{node}.{prop}' inspection")
+                                    return prop_data
                                 prop_stats["bins"] = bins
                                 prop_stats["bin_number"] = len(bins)
+                            
+                            
+                            
                             elif ptype in ["number", "integer"]:  # node = 'demographic', prop='age_at_index'
-                                d = [v for v in prop_data if isinstance(v, (int, float))]  # list of only numeric values
-                                # calculate summary stats using the float list d
-                                mean = statistics.mean(d)
-                                median = statistics.median(d)
-                                minimum = min(d)
-                                maximum = max(d)
-                                if (len(d) == 1):  # if only one value, no stdev and no outliers
-                                    std = "NA"
-                                    outliers = []
-                                else:
-                                    std = statistics.stdev(d)
-                                    # Get outliers by mean +/- outlier_threshold * stdev
-                                    cutoff = (std * outlier_threshold)  # three times the standard deviation is default
-                                    lower, upper = (mean - cutoff,mean + cutoff)  # cut-offs for outliers is 3 times the stdev below and above the mean
-                                    outliers = sorted(list(set([x for x in d if x < lower or x > upper])))
-                                    # if property type is 'integer', change min, max, median to int type
+
                                 if ptype == "integer":
-                                    median = int(median)  # median
-                                    minimum = int(minimum)  # min
-                                    maximum = int(maximum)  # max
-                                    outliers = [int(i) for i in outliers]  # convert outliers from float to int
+                                    d = [int(x) for x in prop_data]
+                                else:
+                                    d = [float(x) for x in prop_data]
+                                try:
+                                    mean = statistics.mean(d)
+                                    median = statistics.median(d)
+                                    minimum = min(d)
+                                    maximum = max(d)
+                                    if (len(d) == 1):  # if only one value, no stdev and no outliers
+                                        std = "NA"
+                                        outliers = []
+                                    else:
+                                        std = statistics.stdev(d)
+                                        # Get outliers by mean +/- outlier_threshold * stdev
+                                        cutoff = (std * outlier_threshold)  # three times the standard deviation is default
+                                        lower, upper = (mean - cutoff,mean + cutoff)  # cut-offs for outliers is 3 times the stdev below and above the mean
+                                        outliers = sorted(list(set([x for x in d if x < lower or x > upper])))
+                                        # if property type is 'integer', change min, max, median to int type
+                                    if ptype == "integer":
+                                        median = int(median)  # median
+                                        minimum = int(minimum)  # min
+                                        maximum = int(maximum)  # max
+                                        outliers = [int(i) for i in outliers]  # convert outliers from float to int
+                                except Exception as e:
+                                    print(f"\n\nCould not calculate numeric stats for property '{prop}' of type '{ptype}': {e}\n\n")
+                                    print(f"\tfirst 10 values for {node}.{prop}: {list(set(d))[:10]}\n\n")
+                                    print(f"\n\n\tError: returning 'd' for '{node}.{prop}' inspection")
+                                    return prop_data
+                                
+
                                 prop_stats["stdev"] = std
                                 prop_stats["mean"] = mean
                                 prop_stats["median"] = median
@@ -3873,7 +3902,13 @@ class Gen3Expansion:
                                 print(f"\t\t\n\n\n\nUnhandled property type!\n\n '{prop}': {ptype}\n\n\n\n")
                                 exit()
                         if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
-                            prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
+                            # for each bin, check if it's more than 10% of the total counts. If so, add it to a list: limited_bins
+                            if str(bin_limit).endswith('%'):
+                                bin_limit_value = int(bin_limit[:-1]) / 100
+                                limited_bins = [b for b in prop_stats["bins"] if b[1] > bin_limit_value * sum(c[1] for c in prop_stats["bins"])]
+                                prop_stats["bins"] = limited_bins
+                            elif len(prop_stats["bins"]) > int(bin_limit):
+                                prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
                         pdata.append(prop_stats)
 
         rdf = pd.DataFrame(pdata)
@@ -3910,6 +3945,8 @@ class Gen3Expansion:
             outname = f"{outdir}/{outname}"
             rdf.to_csv(outname, sep="\t", index=False, encoding="utf-8")
             sys.stdout.write("\rReport written to file:".ljust(200, " "))
+            if bin_limit:
+                print(f"\n\tUsed a bin limit of '{bin_limit}' when summarizing properties.\n\tSet to bin_limit=False to see all bins in the report.")
             print(f"\n\t{outname}")
 
         return summary
