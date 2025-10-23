@@ -3645,7 +3645,7 @@ class Gen3Expansion:
         self,
         data_dir,
         dm,
-        outdir='.',
+        outdir=False,
         outlier_threshold=10,
         omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type'],
         omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
@@ -3674,8 +3674,15 @@ class Gen3Expansion:
         Examples:
             s = summarize_props_across_projects(data_dir='prod_jsons/', dm=dm)
         """
+        if not outdir:
+            outdir = data_dir
         dir_pattern = f"*_{save_format}s"
         project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
+        if len(project_dirs) == 0:
+            print("No project directories found in data_dir with pattern '{}': \n\t'{}'!".format(dir_pattern, data_dir))
+            if save_format == 'json':
+                print("\n\tNo JSON files found. Did you mean to search for TSVs? If so, set save_format='tsv'.")
+            return None
         nn_nodes, nn_props, null_nodes, null_props, all_prop_ids = [], [], [], [], []
         msg = "Summarizing sheepdog data exports in '{}':\n".format(data_dir)
         print("\n\n{}".format(msg))
