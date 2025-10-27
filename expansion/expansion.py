@@ -3974,7 +3974,7 @@ class Gen3Expansion:
         dm,
         outdir=False,
         omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
-        omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type','instance_uids'],
+        omit_props=['associated_ids', 'authz', 'bucket_path', 'callset', 'case_ids', 'case_submitter_id', 'created_datetime', 'derived_parent_subject_id', 'derived_topmed_subject_id', 'error_type', 'error_type', 'file_md5sum', 'file_name', 'file_size', 'file_state', 'ga4gh_drs_uri', 'id', 'instance_uids', 'library_name', 'md5sum', 'object_id', 'participant_id', 'project_id', 'read_group_name', 'sample_id', 'series_uid', 'specimen_id', 'state', 'state_comment', 'study_uid', 'subject_ids', 'submitter_id', 'token_record_id', 'token_record_id', 'type', 'updated_datetime', 'visit_id'],
         sample_omit_props=True,
         bin_limit='5%',
         write_report=True,
@@ -4152,9 +4152,8 @@ class Gen3Expansion:
 
                             if prop in omit_props and not sample_omit_props:
                                 continue
-                                # sample only the first 10 non-null values for inspection
                             elif prop in omit_props and sample_omit_props:
-                                prop_data = prop_data[:10]
+                                prop_data = prop_data[:10] # sample only the first 10 non-null values for inspection
 
                             if ptype in ['string', 'boolean', 'date', 'number', 'integer'] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 counts = Counter(prop_data)
