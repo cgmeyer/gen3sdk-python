@@ -3548,12 +3548,23 @@ class Gen3Expansion:
         if not prop_type and 'enum' not in list(prop_type) and '_definitions' in dm:
             if prop in dm['_definitions']:
                 definition = dm['_definitions'][prop]
-                if 'type' not in p and 'enum' not in p and 'type' in definition:
+                if 'type' not in prop_def and 'enum' not in prop_def and 'type' in definition:
                     prop_type = definition['type']
-                elif 'type' not in p and 'enum' not in p and 'oneOf' in definition:
+                elif 'type' not in prop_def and 'enum' not in prop_def and 'oneOf' in definition:
                     oneof = definition['oneOf']
-                    oneof = [t for t in oneof if 'type' in t]
-                    types = [t['type'] for t in oneof if t['type'] != 'null']
+                    if any(['type' in t for t in oneof]):
+                        types = [t['type'] for t in oneof if t['type'] != 'null']
+                        if len(types) == 1:
+                            prop_type = types[0]
+                        else:
+                            prop_type = types
+                    elif any(['enum' in t for t in oneof]):
+                        enums = [t['enum'] for t in oneof if t['enum'] != 'null']
+                        all_enums = sorted(list(set([item for sublist in enums for item in sublist])))
+                        if len(all_enums) >= 1:
+                            prop_type = {'enum': all_enums}
+                        else:
+                            prop_type = oneof                    
                     if len(types) == 1:
                         prop_type = types[0]
                     else:
@@ -3647,8 +3658,9 @@ class Gen3Expansion:
         dm,
         outdir=False,
         outlier_threshold=10,
-        omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type'],
         omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
+        omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type','instance_uids'],
+        sample_omit_props=True,
         bin_limit='5%',
         write_report=True,
         report_null=True,
@@ -3694,7 +3706,8 @@ class Gen3Expansion:
             node_pattern = f"*_{node}.{save_format}"
             fnames = glob.glob(f"{data_dir}/*/{node_pattern}")
             link_props = self.get_link_props(node,dm)
-            node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
+            #node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
+            node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in link_props]
             if len(fnames) == 0:
                 # add node.prop to report as all null
                 for prop in node_props:
@@ -3827,8 +3840,13 @@ class Gen3Expansion:
                             nn_props.append(prop_id)
                             all_prop_ids.append(prop_id)
                             prop_stats["all_null"] = False
-                            # msg = "\t'{}'".format(prop_id)
-                            # sys.stdout.write("\r" + str(msg).ljust(200, " "))
+
+                            if prop in omit_props and not sample_omit_props:
+                                continue
+                                # sample only the first 10 non-null values for inspection
+                            elif prop in omit_props and sample_omit_props:
+                                prop_data = prop_data[:10]
+
                             if ptype in ["string", "boolean", "date"] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 counts = Counter(prop_data)
                                 cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
@@ -3884,6 +3902,279 @@ class Gen3Expansion:
                                 """
                                 {'array': 'number'},
                                 {'array': {'enum': [
+                                {'array': 'string'},
+                                """
+                                joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
+                                counts = Counter(joined_data)
+                                cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
+                                bins = [tuple(x) for x in cdf.values]
+                                bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
+                                prop_stats["bins"] = bins
+                                prop_stats["bin_number"] = len(bins)
+                                #elif isinstance(ptype, dict) and 'integer' in ptype['array'] or 'number' in ptype['array']:
+                            else:  # If its not in the list of ptypes, exit
+                                print(f"\t\t\n\n\n\nUnhandled property type!\n\n '{prop}': {ptype}\n\n\n\n")
+                                exit()
+                        if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
+                            # for each bin, check if it's more than 10% of the total counts. If so, add it to a list: limited_bins
+                            if str(bin_limit).endswith('%'):
+                                bin_limit_value = int(bin_limit[:-1]) / 100
+                                limited_bins = [b for b in prop_stats["bins"] if b[1] > bin_limit_value * sum(c[1] for c in prop_stats["bins"])]
+                                prop_stats["bins"] = limited_bins
+                            elif len(prop_stats["bins"]) > int(bin_limit):
+                                prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
+                        pdata.append(prop_stats)
+        rdf = pd.DataFrame(pdata)
+        if not report_null: # if report_null == False
+            rdf = rdf.loc[rdf["all_null"] != True]
+        rdf.columns = rdf.columns.str.strip() # strip the col names so we can sort the report
+        rdf.sort_values(by=["all_null", "node", "property"], inplace=True)
+        rdf.reset_index(drop=True, inplace=True)        
+
+        summary = {}
+        summary["report"] = rdf
+        summary["all_prop_ids"] = all_prop_ids
+
+        # summarize all properties
+        nn_props = sorted(list(set(nn_props)))
+        summary["nn_props"] = nn_props
+
+        null_props = [prop for prop in null_props if prop not in nn_props]
+        summary["null_props"] = sorted(list(set(null_props)))
+
+        # summarize all nodes
+        nn_nodes = sorted(list(set(nn_nodes)))
+        summary["nn_nodes"] = nn_nodes
+        null_nodes = [node for node in report_nodes if node not in nn_nodes]
+        summary["null_nodes"] = null_nodes
+
+        if write_report: # write_report == True
+            self.create_output_dir(outdir=outdir)
+            if "/" in data_dir:
+                name = data_dir.split("/")[-1]
+            else:
+                name = data_dir
+            outname = f"data_summary_{name}.tsv"
+            outname = f"{outdir}/{outname}"
+            rdf.to_csv(outname, sep="\t", index=False, encoding="utf-8")
+            sys.stdout.write("\rReport written to file:".ljust(200, " "))
+            if bin_limit:
+                print(f"\n\tUsed a bin limit of '{bin_limit}' when summarizing properties.\n\tSet to bin_limit=False to see all bins in the report.")
+            print(f"\n\t{outname}")
+
+        return summary
+
+
+
+
+
+    def get_prop_histograms_across_projects(
+        self,
+        data_dir,
+        dm,
+        outdir=False,
+        omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"],
+        omit_props=['project_id','type','id','submitter_id','created_datetime','updated_datetime','case_submitter_id','participant_id','specimen_id','library_name','read_group_name','derived_topmed_subject_id','derived_parent_subject_id','case_ids','subject_ids','visit_id','sample_id','token_record_id','md5sum','file_md5sum','file_size','bucket_path','ga4gh_drs_uri','file_name','object_id','series_uid','study_uid','token_record_id','state','state_comment','file_state','error_type','associated_ids','authz','callset','error_type','instance_uids'],
+        sample_omit_props=True,
+        bin_limit='5%',
+        write_report=True,
+        report_null=True,
+        save_format='json'
+    ):
+        """
+        Returns histograms ({value : count,...}) per node and property in the specified data directory containing sheepdog exports (using "exp.export_sheepdog_data()". Either TSVs or JSONs as input).
+        For each property the total, non-null and null counts are returned across all projects.
+        For all data types, bins and the number of unique bins are returned across all projects (value histograms).
+
+        Args:
+            data_dir(str): data export directory
+            dm(dict): data model of the commons result of func Gen3Submission.get_dictionary_all()
+            omit_props(list): Properties to omit from being summarized. It doesn't make sense to summarize certain properties, e.g., those with all unique values. May want to omit: ['sample_id','specimen_number','current_medical_condition_name','medical_condition_name','imaging_results','medication_name'].
+            omit_nodes(list): Nodes in the data dictionary to omit from being summarized, e.g., program, project, data_release, root and metaschema.
+            outdir(str): A directory for the output files.
+            bin_limit(str, int or False): If a string ending with %, adds bins based on whether they exceed the specified percentage of the total. If an integer, limits the number of bins reported for string, enum, array and boolean properties to the specified number. Default is 5%. Set to False for no limit. If all vals are unique, with a 5% bin_limit, there will be at most 20 bins (each with 1 value).
+            write_report(bool): If True, writes the summary report to a TSV file in outdir. Default is True.
+            report_null(bool): If True, includes properties that are null in all projects. Default is True.
+        Examples:
+            s = summarize_props_across_projects(data_dir='prod_jsons/', dm=dm)
+        """
+        if not outdir:
+            outdir = data_dir
+        dir_pattern = f"*_{save_format}s"
+        project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
+        if len(project_dirs) == 0:
+            print("No project directories found in data_dir with pattern '{}': \n\t'{}'!".format(dir_pattern, data_dir))
+            if save_format == 'json':
+                print("\n\tNo JSON files found. Did you mean to search for TSVs? If so, set save_format='tsv'.")
+            return None
+        nn_nodes, nn_props, null_nodes, null_props, all_prop_ids = [], [], [], [], []
+        msg = "Summarizing sheepdog data exports in '{}':\n".format(data_dir)
+        print("\n\n{}".format(msg))
+
+        # Walk through nodes in dm and find exported data (json or tsv) in each project directory for that node
+        pdata = []
+        report_nodes = [n for n in dm.keys() if n not in omit_nodes]
+        for node in report_nodes:
+            node_pattern = f"*_{node}.{save_format}"
+            fnames = glob.glob(f"{data_dir}/*/{node_pattern}")
+            link_props = self.get_link_props(node,dm)
+            #node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
+            node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in link_props]
+            if len(fnames) == 0:
+                # add node.prop to report as all null
+                for prop in node_props:
+                    prop_type = self.get_prop_type(prop, node, dm)
+                    pdata.append(
+                        {
+                            "prop_id": f"{node}.{prop}",
+                            "node": node,
+                            "property": prop,
+                            "type": prop_type,
+                            "N": 0,
+                            "nn": 0,
+                            "null": 0,
+                            "perc_null": 0,
+                            "all_null": True,
+                            "min": None,
+                            "max": None,
+                            "median": None,
+                            "mean": None,
+                            "stdev": None,
+                            "bin_number": None,
+                            "bins": None,
+                            "projects": [],
+                        }
+                    )
+            else:
+                if 'all_data' in locals():
+                    del all_data # this is going to be all_data for the new prop; make sure we don't use data from the previous prop
+                for fname in fnames:
+                    # open all files for this node across all projects and concatenate them
+                    try: # note: using quotechar='`' below because some files have unescaped quotes in exported string data
+                        if save_format == 'json':
+                            #df = pd.read_json(fname, dtype=str)
+                            data = json.load(open(fname))['data']
+                        elif save_format == 'tsv':
+                            data = pd.read_csv(fname, sep="\t", header=0, dtype=str, engine='python', on_bad_lines='warn', quotechar='`')
+                    except Exception as e:
+                        print(f"Couldn't read TSV '{fname}' as a dataframe:\n\t{e}")
+                        data = pd.DataFrame()
+                    if len(data) == 0:
+                        print(f"\t\t'{node}' TSV is empty. No data to summarize.\n")
+                    else:
+                        if save_format == 'json':
+                            all_data = all_data + data if 'all_data' in locals() else data
+                        elif save_format == 'tsv':
+                            all_data = pd.concat([all_data,data]) if 'all_data' in locals() else data
+                if len(all_data) == 0:
+                    print(f"\t\tNo data found for node '{node}' in any project TSVs.\n")
+                    # add each node.prop for empty node to report node/props as all null
+                    null_nodes.append(node)
+                    for prop in node_props:
+                        prop_type = self.get_prop_type(prop, node, dm)
+                        pdata.append(
+                            {
+                                "prop_id": f"{node}.{prop}",
+                                "projects": [],
+                                "node": node,
+                                "property": prop,
+                                "type": prop_type,
+                                "N": 0,
+                                "nn": 0,
+                                "null": 0,
+                                "perc_null": 0,
+                                "all_null": True,
+                                "min": None,
+                                "max": None,
+                                "median": None,
+                                "mean": None,
+                                "stdev": None,
+                                "bin_number": None,
+                                "bins": None,
+                            }
+                        )
+                else:
+                    # get stats for each node.prop
+                    print(f"\nSummarizing node '{node}' across {len(fnames)} project TSVs with {len(all_data)} total records and {len(node_props)} properties (excluding links and omitted props).")
+                    nn_nodes.append(node)
+                    for prop in node_props:  # prop=props[0]
+                        prop_id = f"{node}.{prop}"
+                        print(prop_id)
+                        # Get node_prop data
+                        ptype = self.get_prop_type(prop, node, dm)
+                        if save_format == 'json':
+                            if ptype == 'string':
+                                prop_data = [d.get(prop, np.nan) for d in all_data]
+                                prop_data = [d.replace('\n','').replace('\t','') if d not in [np.nan, None, ""] else np.nan for d in prop_data]
+                            else:
+                                prop_data = [d.get(prop, np.nan) for d in all_data]
+                            prop_pids = sorted(list(set([d.get("project_id", np.nan) for d in all_data])))
+                        elif save_format == 'tsv':
+                            prop_data = list(all_data.get(prop, [np.nan]*len(all_data)))
+                            prop_pids = sorted(list(set(all_data.get("project_id", [np.nan]*len(all_data)))))
+                        # count number of None
+                        null = sum(1 for d in prop_data if str(d) in ['nan','None',''])
+                        nn = sum(1 for d in prop_data if str(d) not in ['nan','None',''])
+                        total = len(prop_data)
+                        if nn + null != total:
+                            print(f"\n\n Total count ({total}) not equal to the null count ({null}) plus non-null count ({nn}) for '{node}.{prop}'!\n\n")
+                            print("\n\n\t\tReturning 'prop_data' for inspection.")
+                            return prop_data
+                        perc_null = round(100*null / total if total > 0 else 0, 2)
+                        prop_stats = {
+                            "prop_id": prop_id,
+                            "projects": prop_pids,
+                            "node": node,
+                            "property": prop,
+                            "type": ptype,
+                            "N": len(prop_data),
+                            "nn": nn,
+                            "null": null,
+                            "perc_null": perc_null,
+                            "all_null": np.nan,
+                            "min": np.nan,
+                            "max": np.nan,
+                            "median": np.nan,
+                            "mean": np.nan,
+                            "stdev": np.nan,
+                            "bin_number": np.nan,
+                            "bins": np.nan,
+                        }
+                        if nn == 0:
+                            null_props.append(prop_id)
+                            prop_stats["all_null"] = True
+                        else:
+                            prop_data = [x for x in prop_data if str(x) not in ['nan','None','']]
+                            #print(f"{node} {prop}")
+                            nn_props.append(prop_id)
+                            all_prop_ids.append(prop_id)
+                            prop_stats["all_null"] = False
+
+                            if prop in omit_props and not sample_omit_props:
+                                continue
+                                # sample only the first 10 non-null values for inspection
+                            elif prop in omit_props and sample_omit_props:
+                                prop_data = prop_data[:10]
+
+                            if ptype in ['string', 'boolean', 'date', 'number', 'integer'] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
+                                counts = Counter(prop_data)
+                                cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
+                                bins = [tuple(x) for x in cdf.values]
+                                try:
+                                    bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
+                                except Exception as e:
+                                    print(f"\n\nCould not sort bins for property '{prop}' of type '{ptype}': {e}\n\n")
+                                    print(f"\tfirst 10 values for {node}.{prop}: {list(set(prop_data))[:10]}\n\n")
+                                    print(f"\n\n\tError: returning 'prop_data' for '{node}.{prop}' inspection")
+                                    return prop_data
+                                prop_stats['bins'] = bins
+                                prop_stats['bin_number'] = len(bins)
+                            elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
+                                #if isinstance(ptype, dict) and 'enum' in ptype['array'] or 'string' in ptype['array']:
+                                # sort each list by values and then make comma-separated lists for binning
+                                """
+                                {'array': 'number'},
+                                {'array': {'enum': [<enum_values>]}},
                                 {'array': 'string'},
                                 """
                                 joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
