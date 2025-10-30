@@ -4034,9 +4034,9 @@ class Gen3Expansion:
                             "null": 0,
                             "perc_null": 0,
                             "all_null": True,
+                            "projects": [],
                             "bin_number": None,
-                            "bins": None,
-                            "projects": []
+                            "bins": None
                         }
                     )
             else:
@@ -4060,9 +4060,9 @@ class Gen3Expansion:
                             all_data = all_data + data if 'all_data' in locals() else data
                         elif save_format == 'tsv':
                             all_data = pd.concat([all_data,data]) if 'all_data' in locals() else data
-                if len(all_data) == 0:
+                if len(all_data) == 0: 
+                    # no data, add all node.props from this node to all_null
                     print(f"\t\tNo data found for node '{node}' in any project TSVs.\n")
-                    # add each node.prop for empty node to report node/props as all null
                     null_nodes.append(node)
                     for prop in node_props:
                         prop_type = self.get_prop_type(prop, node, dm)
@@ -4078,13 +4078,14 @@ class Gen3Expansion:
                                 "null": 0,
                                 "perc_null": 0,
                                 "all_null": True,
+                                "projects": [],
                                 "bin_number": None,
                                 "bins": None,
                                 "projects": []
                             }
                         )
                 else:
-                    # get stats for each node.prop
+                    # get counts of values for each node.prop (histograms)
                     print(f"\nSummarizing node '{node}' across {len(fnames)} project TSVs with {len(all_data)} total records and {len(node_props)} properties (excluding links and omitted props).")
                     nn_nodes.append(node)
                     for prop in node_props:  # prop=props[0]
@@ -4111,6 +4112,7 @@ class Gen3Expansion:
                             print("\n\n\t\tReturning 'prop_data' for inspection.")
                             return prop_data
                         perc_null = round(100*null / total if total > 0 else 0, 2)
+                        projects = list(set([d.get("project_id", np.nan) for d in all_data])) if save_format == 'json' else list(set(all_data.get("project_id", [np.nan]*len(all_data))))
                         prop_stats = {
                             "prop_id": prop_id,
                             "projects": prop_pids,
@@ -4122,9 +4124,9 @@ class Gen3Expansion:
                             "null": null,
                             "perc_null": perc_null,
                             "all_null": np.nan,
+                            "projects": projects,
                             "bin_number": np.nan,
-                            "bins": np.nan,
-                            "projects": []
+                            "bins": np.nan
                         }
                         if nn == 0:
                             null_props.append(prop_id)
@@ -4135,24 +4137,26 @@ class Gen3Expansion:
                             all_prop_ids.append(prop_id)
                             prop_stats["all_null"] = False
 
+                            # Handle omit_props
                             if prop in omit_props and not sample_omit_props:
                                 continue
                             elif prop in omit_props and sample_omit_props:
-                                prop_data = prop_data[:10] # sample only the first 10 non-null values for inspection
-
+                                prop_data = prop_data[:10] # sample only the first 10 non-null values
+                            # Get bins for all data types except arrays, convert values to strings
                             if ptype in ['string', 'boolean', 'date', 'number', 'integer'] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 prop_data = [str(x) for x in prop_data if str(x) not in ['nan','None','']]
                                 counts = Counter(prop_data)
+                            # Get bins of comma-separated strings for arrays
                             elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
                                 """
                                 {'array': 'number'},
                                 {'array': {'enum': [<enum_values>]}},
                                 {'array': 'string'},
                                 """
-                                #prop_data = [str(x) for x in prop_data if str(x) not in ['nan','None','']]
                                 joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
                                 counts = Counter(joined_data)
-                            else:  # If its not in the list of ptypes, exit
+                            # If its not in the list of ptypes, exit
+                            else:  
                                 print(f"\t\t\n\n\n\nUnhandled property type!\n\n '{prop}': {ptype}\n\n\n\n")
                                 exit()
                             bins = dict(counts)
@@ -4160,12 +4164,14 @@ class Gen3Expansion:
                             prop_stats['bins'] = bins
                             prop_stats['bin_number'] = len(bins)
 
+                        # Apply bin_limit if specified
                         if bin_limit and isinstance(prop_stats["bins"], dict): # if bin_limit != False
-                            # for each bin, check if it's more than 10% of the total counts. If so, add it to a list: limited_bins
+                            # if using a bin percentage, for each bin, check if it's more than x% of the total counts. If so, add it to limited_bins
                             if str(bin_limit).endswith('%'):
                                 bin_limit_value = int(bin_limit[:-1]) / 100
                                 limited_bins = [b for b in prop_stats['bins'].items() if b[1] > bin_limit_value * sum(c[1] for c in prop_stats["bins"].items())]
                                 prop_stats['bins'] = dict(limited_bins)
+                            # if using a bin integer limit, limit the number of bins to that number
                             elif len(prop_stats['bins']) > int(bin_limit):
                                 prop_stats['bins'] = dict(list(prop_stats['bins'].items())[: int(bin_limit)])
                         pdata.append(prop_stats)
