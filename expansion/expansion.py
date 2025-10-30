@@ -422,11 +422,10 @@ class Gen3Expansion:
             project_id = project_ids[i]
             prog, proj = project_id.split("-", 1)
             print(f"\n{i+1}/{len(project_ids)}: '{project_id}' Downloading data for project...")
-            mydir = "{}/{}_{save_format}s".format(outdir, project_id)  # create the directory to store data exports
+            mydir = "{}/{}_{}s".format(outdir, project_id, save_format)  # create the directory to store data exports
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
             # get node counts for the project and subset to nodes with >0 records
-            node_counts = {}
             counts = self.get_node_counts(nodes, project_id=project_id)
             for node in counts:
                 filename = f"{mydir}/{project_id}_{node}.{save_format}"
@@ -501,7 +500,7 @@ class Gen3Expansion:
             project_id = projects[i]
             prog, proj = project_id.split("-", 1)
             print(f"\n{i+1}/{len(projects)}: '{project_id}' Downloading data for project...")
-            mydir = "{}/{}_tsvs".format(outdir, project_id)  # create the directory to store data exports
+            mydir = "{}/{}_{}s".format(outdir, project_id, save_format)  # create the directory to store data exports
             if not os.path.exists(mydir):
                 os.makedirs(mydir)
             # get node counts for the project and subset to nodes with >0 records
@@ -3688,7 +3687,7 @@ class Gen3Expansion:
         """
         if not outdir:
             outdir = data_dir
-        dir_pattern = f"*_{save_format}s"
+        dir_pattern = f"*_{save_format}"
         project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
         if len(project_dirs) == 0:
             print("No project directories found in data_dir with pattern '{}': \n\t'{}'!".format(dir_pattern, data_dir))
@@ -4000,7 +3999,7 @@ class Gen3Expansion:
         """
         if not outdir:
             outdir = data_dir
-        dir_pattern = f"*_{save_format}s"
+        dir_pattern = f"*_{save_format}?"
         project_dirs = glob.glob("{}/{}".format(data_dir, dir_pattern))
         if len(project_dirs) == 0:
             print("No project directories found in data_dir with pattern '{}': \n\t'{}'!".format(dir_pattern, data_dir))
@@ -4035,14 +4034,9 @@ class Gen3Expansion:
                             "null": 0,
                             "perc_null": 0,
                             "all_null": True,
-                            "min": None,
-                            "max": None,
-                            "median": None,
-                            "mean": None,
-                            "stdev": None,
                             "bin_number": None,
                             "bins": None,
-                            "projects": [],
+                            "projects": []
                         }
                     )
             else:
@@ -4084,13 +4078,9 @@ class Gen3Expansion:
                                 "null": 0,
                                 "perc_null": 0,
                                 "all_null": True,
-                                "min": None,
-                                "max": None,
-                                "median": None,
-                                "mean": None,
-                                "stdev": None,
                                 "bin_number": None,
                                 "bins": None,
+                                "projects": []
                             }
                         )
                 else:
@@ -4099,9 +4089,9 @@ class Gen3Expansion:
                     nn_nodes.append(node)
                     for prop in node_props:  # prop=props[0]
                         prop_id = f"{node}.{prop}"
-                        print(prop_id)
                         # Get node_prop data
                         ptype = self.get_prop_type(prop, node, dm)
+                        print(f"{prop_id}: {ptype}")
                         if save_format == 'json':
                             if ptype == 'string':
                                 prop_data = [d.get(prop, np.nan) for d in all_data]
@@ -4132,19 +4122,14 @@ class Gen3Expansion:
                             "null": null,
                             "perc_null": perc_null,
                             "all_null": np.nan,
-                            "min": np.nan,
-                            "max": np.nan,
-                            "median": np.nan,
-                            "mean": np.nan,
-                            "stdev": np.nan,
                             "bin_number": np.nan,
                             "bins": np.nan,
+                            "projects": []
                         }
                         if nn == 0:
                             null_props.append(prop_id)
                             prop_stats["all_null"] = True
                         else:
-                            prop_data = [x for x in prop_data if str(x) not in ['nan','None','']]
                             #print(f"{node} {prop}")
                             nn_props.append(prop_id)
                             all_prop_ids.append(prop_id)
@@ -4156,46 +4141,35 @@ class Gen3Expansion:
                                 prop_data = prop_data[:10] # sample only the first 10 non-null values for inspection
 
                             if ptype in ['string', 'boolean', 'date', 'number', 'integer'] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
+                                prop_data = [str(x) for x in prop_data if str(x) not in ['nan','None','']]
                                 counts = Counter(prop_data)
-                                cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
-                                bins = [tuple(x) for x in cdf.values]
-                                try:
-                                    bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
-                                except Exception as e:
-                                    print(f"\n\nCould not sort bins for property '{prop}' of type '{ptype}': {e}\n\n")
-                                    print(f"\tfirst 10 values for {node}.{prop}: {list(set(prop_data))[:10]}\n\n")
-                                    print(f"\n\n\tError: returning 'prop_data' for '{node}.{prop}' inspection")
-                                    return prop_data
-                                prop_stats['bins'] = bins
-                                prop_stats['bin_number'] = len(bins)
                             elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
-                                #if isinstance(ptype, dict) and 'enum' in ptype['array'] or 'string' in ptype['array']:
-                                # sort each list by values and then make comma-separated lists for binning
                                 """
                                 {'array': 'number'},
                                 {'array': {'enum': [<enum_values>]}},
                                 {'array': 'string'},
                                 """
+                                #prop_data = [str(x) for x in prop_data if str(x) not in ['nan','None','']]
                                 joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
                                 counts = Counter(joined_data)
-                                cdf = pd.DataFrame.from_dict(counts, orient="index").reset_index()
-                                bins = [tuple(x) for x in cdf.values]
-                                bins = sorted(sorted(bins, key=lambda x: (x[0])),key=lambda x: (x[1]),reverse=True)  # sort first by name, then by value. This way, names with same value are in same order.
-                                prop_stats["bins"] = bins
-                                prop_stats["bin_number"] = len(bins)
-                                #elif isinstance(ptype, dict) and 'integer' in ptype['array'] or 'number' in ptype['array']:
                             else:  # If its not in the list of ptypes, exit
                                 print(f"\t\t\n\n\n\nUnhandled property type!\n\n '{prop}': {ptype}\n\n\n\n")
                                 exit()
-                        if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
+                            bins = dict(counts)
+                            bins = dict(sorted(bins.items(), key=lambda item: item[1], reverse=True))
+                            prop_stats['bins'] = bins
+                            prop_stats['bin_number'] = len(bins)
+
+                        if bin_limit and isinstance(prop_stats["bins"], dict): # if bin_limit != False
                             # for each bin, check if it's more than 10% of the total counts. If so, add it to a list: limited_bins
                             if str(bin_limit).endswith('%'):
                                 bin_limit_value = int(bin_limit[:-1]) / 100
-                                limited_bins = [b for b in prop_stats["bins"] if b[1] > bin_limit_value * sum(c[1] for c in prop_stats["bins"])]
-                                prop_stats["bins"] = limited_bins
-                            elif len(prop_stats["bins"]) > int(bin_limit):
-                                prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
+                                limited_bins = [b for b in prop_stats['bins'].items() if b[1] > bin_limit_value * sum(c[1] for c in prop_stats["bins"].items())]
+                                prop_stats['bins'] = dict(limited_bins)
+                            elif len(prop_stats['bins']) > int(bin_limit):
+                                prop_stats['bins'] = dict(list(prop_stats['bins'].items())[: int(bin_limit)])
                         pdata.append(prop_stats)
+
         rdf = pd.DataFrame(pdata)
         if not report_null: # if report_null == False
             rdf = rdf.loc[rdf["all_null"] != True]
