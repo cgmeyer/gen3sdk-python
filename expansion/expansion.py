@@ -4060,8 +4060,8 @@ class Gen3Expansion:
                             all_data = all_data + data if 'all_data' in locals() else data
                         elif save_format == 'tsv':
                             all_data = pd.concat([all_data,data]) if 'all_data' in locals() else data
+                # if no data, add all node.props from this node to all_null
                 if len(all_data) == 0: 
-                    # no data, add all node.props from this node to all_null
                     print(f"\t\tNo data found for node '{node}' in any project TSVs.\n")
                     null_nodes.append(node)
                     for prop in node_props:
@@ -4084,8 +4084,8 @@ class Gen3Expansion:
                                 "projects": []
                             }
                         )
+                # get counts of values for each node.prop (histograms)
                 else:
-                    # get counts of values for each node.prop (histograms)
                     print(f"\nSummarizing node '{node}' across {len(fnames)} project TSVs with {len(all_data)} total records and {len(node_props)} properties (excluding links and omitted props).")
                     nn_nodes.append(node)
                     for prop in node_props:  # prop=props[0]
@@ -4142,18 +4142,18 @@ class Gen3Expansion:
                                 continue
                             elif prop in omit_props and sample_omit_props:
                                 prop_data = prop_data[:10] # sample only the first 10 non-null values
-                            # Get bins for all data types except arrays, convert values to strings
+                            # all non-arrays: Get bins for all data types except arrays, convert values to strings
                             if ptype in ['string', 'boolean', 'date', 'number', 'integer'] or (isinstance(ptype, dict) and 'enum' in ptype):  # node = 'demographic', prop
                                 prop_data = [str(x) for x in prop_data if str(x) not in ['nan','None','']]
                                 counts = Counter(prop_data)
-                            # Get bins of comma-separated strings for arrays
+                            # arrays: Get bins of comma-separated strings
                             elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
                                 """
                                 {'array': 'number'},
                                 {'array': {'enum': [<enum_values>]}},
                                 {'array': 'string'},
                                 """
-                                joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data]
+                                joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data if str(v) not in ['nan','None','']]
                                 counts = Counter(joined_data)
                             # If its not in the list of ptypes, exit
                             else:  
