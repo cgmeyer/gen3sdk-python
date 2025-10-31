@@ -3665,7 +3665,7 @@ class Gen3Expansion:
         report_null=True,
         save_format='json'
     ):
-        """
+        """        
         Returns a summary of data per node and property in the specified data directory containing sheepdog exports (using "exp.export_sheepdog_data()").
         For each property the total, non-null and null counts are returned across all projects.
         For string, enumeration and boolean properties, bins and the number of unique bins are returned across all projects.
@@ -3895,7 +3895,7 @@ class Gen3Expansion:
                                 prop_stats["min"] = minimum
                                 prop_stats["max"] = maximum
                                 prop_stats["outliers"] = outliers
-                            elif isinstance(ptype, dict) and 'array' in ptype: # node = 'demographic', prop='race'
+                            elif (isinstance(ptype, dict) and 'array' in ptype) or prop in link_props: # node = 'demographic', prop='race'
                                 #if isinstance(ptype, dict) and 'enum' in ptype['array'] or 'string' in ptype['array']:
                                 # sort each list by values and then make comma-separated lists for binning
                                 """
@@ -3981,6 +3981,22 @@ class Gen3Expansion:
         save_format='json'
     ):
         """
+        self = exp
+        bdc_dir = '/Users/cgmeyer/Documents/Notes/AI/real_benchmarks/BDC'
+        dataset_name = 'prod_jsons_minus_benchmarks_20251029'
+        jdir = f'{bdc_dir}/{dataset_name}'
+        data_dir = jdir
+        node = 'aligned_reads_index'
+        prop = 'submitted_aligned_reads_files'
+        omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"]
+        omit_props=['associated_ids', 'authz', 'bucket_path', 'callset', 'case_ids', 'case_submitter_id', 'created_datetime', 'derived_parent_subject_id', 'derived_topmed_subject_id', 'error_type', 'error_type', 'file_md5sum', 'file_name', 'file_size', 'file_state', 'ga4gh_drs_uri', 'id', 'instance_uids', 'library_name', 'md5sum', 'object_id', 'participant_id', 'project_id', 'read_group_name', 'sample_id', 'series_uid', 'specimen_id', 'state', 'state_comment', 'study_uid', 'subject_ids', 'submitter_id', 'token_record_id', 'token_record_id', 'type', 'updated_datetime', 'visit_id']
+        sample_omit_props=True
+        bin_limit='5%'
+        write_report=True
+        report_null=True
+        save_format='json'
+
+
         Returns histograms ({value : count,...}) per node and property in the specified data directory containing sheepdog exports (using "exp.export_sheepdog_data()". Either TSVs or JSONs as input).
         For each property the total, non-null and null counts are returned across all projects.
         For all data types, bins and the number of unique bins are returned across all projects (value histograms).
@@ -4017,8 +4033,10 @@ class Gen3Expansion:
             node_pattern = f"*_{node}.{save_format}"
             fnames = glob.glob(f"{data_dir}/*/{node_pattern}")
             link_props = self.get_link_props(node,dm)
+            omit_props += link_props
             #node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in omit_props + link_props]
-            node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in link_props]
+            #node_props = [p for p in list(dm[node].get("properties", {}).keys()) if p not in link_props]
+            node_props = [p for p in list(dm[node].get("properties", {}).keys())]
             if len(fnames) == 0:
                 # add node.prop to report as all null
                 for prop in node_props:
@@ -4155,6 +4173,11 @@ class Gen3Expansion:
                                 """
                                 joined_data = [','.join(sorted(v)) if isinstance(v, list) and len(v) > 0 else v for v in prop_data if str(v) not in ['nan','None','']]
                                 counts = Counter(joined_data)
+                            elif prop in link_props:
+                                flat_data = [item for sublist in prop_data if isinstance(sublist, list) for item in sublist]
+                                sids = [l['submitter_id'] for l in flat_data if isinstance(l, dict) and 'submitter_id' in l]
+                                limit_sids = sids[:10] # in case of to-many links, just sample first 10
+                                counts = Counter(limit_sids)
                             # If its not in the list of ptypes, exit
                             else:  
                                 print(f"\t\t\n\n\n\nUnhandled property type!\n\n '{prop}': {ptype}\n\n\n\n")
