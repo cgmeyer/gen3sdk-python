@@ -3981,13 +3981,16 @@ class Gen3Expansion:
         save_format='json'
     ):
         """
+        ## Troubleshooting
         self = exp
         bdc_dir = '/Users/cgmeyer/Documents/Notes/AI/real_benchmarks/BDC'
         dataset_name = 'prod_jsons_minus_benchmarks_20251029'
         jdir = f'{bdc_dir}/{dataset_name}'
         data_dir = jdir
         node = 'aligned_reads_index'
+        node = 'demographic'
         prop = 'submitted_aligned_reads_files'
+        prop = 'bmi_baseline'
         omit_nodes=["metaschema", "root", "program", "project", "data_release","_settings","_definitions","_terms"]
         omit_props=['associated_ids', 'authz', 'bucket_path', 'callset', 'case_ids', 'case_submitter_id', 'created_datetime', 'derived_parent_subject_id', 'derived_topmed_subject_id', 'error_type', 'error_type', 'file_md5sum', 'file_name', 'file_size', 'file_state', 'ga4gh_drs_uri', 'id', 'instance_uids', 'library_name', 'md5sum', 'object_id', 'participant_id', 'project_id', 'read_group_name', 'sample_id', 'series_uid', 'specimen_id', 'state', 'state_comment', 'study_uid', 'subject_ids', 'submitter_id', 'token_record_id', 'token_record_id', 'type', 'updated_datetime', 'visit_id']
         sample_omit_props=True
@@ -3995,7 +3998,6 @@ class Gen3Expansion:
         write_report=True
         report_null=True
         save_format='json'
-
 
         Returns histograms ({value : count,...}) per node and property in the specified data directory containing sheepdog exports (using "exp.export_sheepdog_data()". Either TSVs or JSONs as input).
         For each property the total, non-null and null counts are returned across all projects.
