@@ -3435,6 +3435,7 @@ class Gen3Expansion:
 
     def get_prop_type(self, prop, node, dm, include_enums=True):
         """ Get the type of a property in a node in a Gen3 data model """
+        print(f'node: {node!r}, prop: {prop!r}')
         prop_type = ''
         prop_def = dm[node]['properties'][prop]
         if list(prop_def.keys()) == ['$ref']:
@@ -4441,7 +4442,8 @@ class Gen3Expansion:
                         null = df.loc[df[prop].isnull()]
                         nn = df.loc[df[prop].notnull()]
                         perc_null = len(null)/len(df)
-                        ptype = self.get_prop_type(node, prop, dd)
+                        print(f'node: {node!r}, prop: {prop!r}')
+                        ptype = self.get_prop_type(prop=prop, node=node, dm=dd, include_enums=True)
 
                         # dict for the prop's row in report dataframe
                         prop_stats = {
