@@ -3433,7 +3433,7 @@ class Gen3Expansion:
 
 
 
-    def get_prop_type(self, prop, node, dm, include_enums=True):
+    def get_prop_type(self, prop, node, dm, include_enums=True, include_array_vals=True):
         """ Get the type of a property in a node in a Gen3 data model """
         print(f'node: {node!r}, prop: {prop!r}')
         prop_type = ''
@@ -3612,6 +3612,11 @@ class Gen3Expansion:
                             prop_type = types
         if prop_type == '':
             print(f"\n\nNo type found for property: '{prop}' on node '{node}'!\n\n")
+
+        if 'array' in prop_type:
+            if not include_array_vals:
+                prop_type = 'array'
+
         return prop_type
 
 
@@ -4443,7 +4448,7 @@ class Gen3Expansion:
                         nn = df.loc[df[prop].notnull()]
                         perc_null = len(null)/len(df)
                         print(f'node: {node!r}, prop: {prop!r}')
-                        ptype = self.get_prop_type(prop=prop, node=node, dm=dd, include_enums=True)
+                        ptype = self.get_prop_type(prop=prop, node=node, dm=dd, include_enums=False, include_array_vals=False)
 
                         # dict for the prop's row in report dataframe
                         prop_stats = {
@@ -4615,7 +4620,7 @@ class Gen3Expansion:
                                         prop_id, ptype
                                     )
                                 )
-                                exit()
+                                sys.exit()
 
                         if bin_limit and isinstance(prop_stats["bins"], list): # if bin_limit != False
                             prop_stats["bins"] = prop_stats["bins"][: int(bin_limit)]
