@@ -2911,15 +2911,15 @@ class Gen3Expansion:
         )
 
         now = datetime.datetime.now()
-        date = "{}-{}-{}_{}.{}".format(now.year, now.month, now.day, now.minute, now.second)
+        date = "{}{}{}".format(now.year, now.month, now.day)
 
         if format == "JSON":
-            outname = "{}_indexd_records_{}.json".format(dc,date)
+            outname = f"{dc}_{len(all_records)}_indexd_records_{date}.json"
             with open(outname, "w") as output:
                 output.write(json.dumps(all_records))
 
         if format == "TSV":
-            outname = "{}_indexd_records_{}.tsv".format(dc,date)
+            outname = f"{dc}_{len(all_records)}_indexd_records_{date}.tsv"
             all_records = pd.DataFrame(all_records)
             all_records['md5sum'] = [hashes.get('md5') for hashes in all_records.hashes]
             all_records.to_csv(outname,sep='\t',index=False)
