@@ -2910,16 +2910,18 @@ class Gen3Expansion:
             "\t\tScript finished. Total records retrieved: {}".format(len(all_records))
         )
 
-        now = datetime.datetime.now()
-        date = "{}{}{}".format(now.year, now.month, now.day)
+        #now = datetime.datetime.now()
+        #date = "{}{}{}".format(now.year, now.month, now.day)
+        today = date.today()
+        formatted_date = today.strftime("%Y%m%d")
 
         if format == "JSON":
-            outname = f"{dc}_{len(all_records)}_indexd_records_{date}.json"
+            outname = f"{dc}_{len(all_records)}_indexd_records_{formatted_date}.json"
             with open(outname, "w") as output:
                 output.write(json.dumps(all_records))
 
         if format == "TSV":
-            outname = f"{dc}_{len(all_records)}_indexd_records_{date}.tsv"
+            outname = f"{dc}_{len(all_records)}_indexd_records_{formatted_date}.tsv"
             all_records = pd.DataFrame(all_records)
             all_records['md5sum'] = [hashes.get('md5') for hashes in all_records.hashes]
             all_records.to_csv(outname,sep='\t',index=False)
