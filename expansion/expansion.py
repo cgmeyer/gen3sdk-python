@@ -2385,7 +2385,8 @@ class Gen3Expansion:
                 print("\n\n\tSubmit drop_props argument as a list of properties, e.g.,: drop_props=['id'].\n\n")
 
         # Chunk the file
-        print("\nSubmitting {} with {} records.".format(filename, str(len(df))))
+        node = list(set(df["type"]))
+        print(f"\nSubmitting '{node}' TSV '{filename}' with {len(df)} records.")
         program, project = project_id.split("-", 1)
         api_url = "{}/api/v0/submission/{}/{}".format(self._endpoint, program, project)
         headers = {"content-type": "text/tab-separated-values"}
