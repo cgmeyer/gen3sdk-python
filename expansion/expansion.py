@@ -2912,7 +2912,7 @@ class Gen3Expansion:
 
         #now = datetime.datetime.now()
         #date = "{}{}{}".format(now.year, now.month, now.day)
-        today = date.today()
+        today = datetime.today()
         formatted_date = today.strftime("%Y%m%d")
 
         if format == "JSON":
