@@ -222,3 +222,6 @@ curl https://api.github.com/repos/uc-cdis/cdis-data-client/releases/latest | gre
 
 unzip dataclient_linux.zip
 rm dataclient_linux.zip
+
+
+curl https://api.github.com/repos/uc-cdis/cdis-data-client/releases/latest | grep browser_download_url.*linux |  cut -d '"' -f 4 | wget -qi -
