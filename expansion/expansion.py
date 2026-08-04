@@ -462,7 +462,8 @@ class Gen3Expansion:
         overwrite=False,
         save_empty=False,
         remove_nodes=['program','project','root','data_release','metaschema','_terms','_settings','_definitions'],
-        save_format='tsv'
+        save_format='tsv',
+        prog_proj=False
     ):
         """Function gets a TSV for every node in a specified project.
             Exports TSV files into a directory "project_tsvs/".
@@ -477,8 +478,9 @@ class Gen3Expansion:
         >>> get_project_tsvs(projects = ['internal-test'])
 
         """
-        if nodes == None:
+        if nodes is None or prog_proj:
             dd = self.sub.get_dictionary_all()
+        if nodes is None:
             nodes = sorted([n for n in list(set(dd)) if n not in remove_nodes])
         elif isinstance(nodes, str):
             nodes = [nodes]
@@ -519,6 +521,58 @@ class Gen3Expansion:
                             self.sub.export_node(prog, proj, node, save_format, filename)
                     else:
                         print(f"\t'{node}': {count} records. Skipping.")
+
+            if prog_proj == True:
+                prog_props = [p for p in dd['program']['properties']]
+                # Build project properties from dd, excluding link fields, 'type', and non-queryable system fields
+                proj_link_names = {link['name'] for link in dd['project'].get('links', [])}
+                skip_proj_props = {'type', 'releasable', 'released', 'state', 'intended_release_date'} | proj_link_names
+                proj_props = [p for p in dd['project']['properties'] if p not in skip_proj_props]
+
+                prog_props_str = "\n    ".join(prog_props)
+                proj_props_str = "\n      ".join(proj_props)
+
+                prog_proj_query = """{{
+                    program (name:"{prog}") {{
+                        {prog_props}
+                        projects (code:"{proj}") {{
+                            {proj_props}
+                        }}
+                    }}
+                }}""".format(
+                    prog=prog,
+                    proj=proj,
+                    prog_props=prog_props_str,
+                    proj_props=proj_props_str,
+                )
+                print(f"\t'program'/'project': Querying via peregrine...")
+                result = self.sub.query(prog_proj_query)
+
+                if 'data' in result and 'program' in result['data']:
+                    prog_records = result['data']['program']
+                    proj_records = []
+                    for prog_record in prog_records:
+                        for proj_record in prog_record.get('projects', []):
+                            proj_records.append(proj_record)
+
+                    for node, records in [('program', prog_records), ('project', proj_records)]:
+                        filename = f"{mydir}/{project_id}_{node}.{save_format}"
+                        if os.path.isfile(filename) and not overwrite:
+                            print(f"\t'{node}': Previously downloaded: '{filename}'")
+                        elif records or save_empty:
+                            # Strip nested 'projects' key from program records before saving
+                            if node == 'program':
+                                records = [{k: v for k, v in r.items() if k != 'projects'} for r in records]
+                            df = pd.DataFrame(records)
+                            if save_format == 'tsv':
+                                df.to_csv(filename, sep='\t', index=False)
+                            else:
+                                df.to_csv(filename, index=False)
+                            print(f"\t'{node}': {len(records)} records. Downloaded.")
+                        else:
+                            print(f"\t'{node}': 0 records. Skipping.")
+                else:
+                    print(f"\tWarning: No program/project data returned for '{project_id}'")
 
         cmd = ["ls", mydir]  # look in the download directory
         try:
